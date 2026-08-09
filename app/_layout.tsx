@@ -1,24 +1,58 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { useEffect } from "react";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
+
+import { AuthProvider } from "@/context/AuthContext";
+
+import { initDatabase } from "@/database/database";
+import { startQueueWorker } from "@/services/queue.worker";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    // Initialize SQLite Database
+    initDatabase();
+
+    // Start Offline Queue Worker
+    startQueueWorker();
+  }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardProvider
+        statusBarTranslucent={false}
+        navigationBarTranslucent={false}
+      >
+        <SafeAreaProvider>
+          <AuthProvider>
+            <StatusBar
+              style="dark"
+              backgroundColor="#ffffff"
+              translucent={false}
+            />
+
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: "fade",
+                contentStyle: {
+                  backgroundColor: "#ffffff",
+                },
+              }}
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="auth" />
+              <Stack.Screen name="customer" />
+              <Stack.Screen name="worker" />
+              <Stack.Screen name="shared" />
+            </Stack>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </KeyboardProvider>
+    </GestureHandlerRootView>
   );
 }

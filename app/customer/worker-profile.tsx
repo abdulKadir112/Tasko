@@ -1,22 +1,27 @@
 import { useEffect, useState } from "react";
 import {
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
   ActivityIndicator,
+  Image,
+  StatusBar,
+  Linking,
+  Alert,
 } from "react-native";
 
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getWorkerById } from "@/services/worker.service";
 import { COLORS } from "@/theme";
 
 export default function WorkerProfile() {
   const { id } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
   const workerId = Array.isArray(id) ? id[0] : id;
 
@@ -32,9 +37,7 @@ export default function WorkerProfile() {
   async function loadWorker() {
     try {
       setLoading(true);
-
       const res = await getWorkerById(String(workerId));
-
       setWorker(res.data);
     } catch (error) {
       console.log(error);
@@ -43,219 +46,589 @@ export default function WorkerProfile() {
     }
   }
 
+  async function handleCall() {
+    const phone = worker?.phone || worker?.phoneNumber;
+
+    if (!phone) {
+      Alert.alert("Unavailable", "Phone number not available");
+      return;
+    }
+
+    const url = `tel:${phone}`;
+    const canOpen = await Linking.canOpenURL(url);
+
+    if (!canOpen) {
+      Alert.alert("Error", "Cannot open phone dialer");
+      return;
+    }
+
+    await Linking.openURL(url);
+  }
+
+  function handleChat() {
+    if (!worker?.id) return;
+
+    router.push({
+      pathname: "/shared/chat/room",
+      params: {
+        receiverId: String(worker.id),
+      },
+    });
+  }
+
+  function handleBook() {
+    if (!worker?.id) return;
+
+    router.push({
+      pathname: "/customer/post-job",
+      params: {
+        workerId: String(worker.id),
+        category: worker.category || "",
+      },
+    });
+  }
+
   if (loading) {
     return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          {
-            justifyContent: "center",
-            alignItems: "center",
-          },
-        ]}
-      >
-        <ActivityIndicator
-          size="large"
-          color={COLORS.primary}
-        />
-      </SafeAreaView>
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
     );
   }
 
+  if (!worker) {
+    return (
+      <View style={styles.loading}>
+        <Ionicons name="alert-circle-outline" size={42} color="#94A3B8" />
+        <Text style={styles.loadingText}>Worker not found</Text>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.backLink}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const avatarUri =
+    typeof worker.photoURL === "string" && worker.photoURL.trim()
+      ? worker.photoURL.trim()
+      : typeof worker.avatar === "string" && worker.avatar.trim()
+        ? worker.avatar.trim()
+        : null;
+
+  const rating = Number(worker.rating || 0).toFixed(1);
+  const experience = worker.experience || "N/A";
+  const completedJobs = worker.completedJobs ?? 0;
+  const price = worker.price ?? 0;
+  const city = worker.city || "Not specified";
+  const about =
+    worker.about ||
+    "Professional service provider with quality work and customer satisfaction.";
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons
-              name="arrow-back"
-              size={26}
-              color={COLORS.text}
-            />
-          </TouchableOpacity>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: 120 + insets.bottom,
+        }}
+      >
+        {/* ================= TOP HEADER ================= */}
+        <View style={[styles.hero, { paddingTop: insets.top + 10 }]}>
+          <View style={styles.topBar}>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="arrow-back" size={22} color="#0F172A" />
+            </TouchableOpacity>
+
+            <Text style={styles.heroTitle}>Worker Profile</Text>
+
+            <View style={styles.iconBtnPlaceholder} />
+          </View>
+
+          <View style={styles.profileBlock}>
+            <View style={styles.avatarWrap}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <Text style={styles.avatarEmoji}>👨‍🔧</Text>
+                </View>
+              )}
+              <View style={styles.onlineDot} />
+            </View>
+
+            <Text style={styles.name}>{worker.name || "Worker"}</Text>
+
+            <View style={styles.ratingRow}>
+              <Ionicons name="star" size={16} color="#F59E0B" />
+              <Text style={styles.ratingText}>{rating}</Text>
+              <Text style={styles.ratingSub}>• Verified Pro</Text>
+            </View>
+
+            <View style={styles.locationRow}>
+              <Ionicons name="location-outline" size={15} color="#DBEAFE" />
+              <Text style={styles.locationText}>{city}</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Avatar */}
-        <View style={styles.avatar}>
-          <Text style={styles.avatarEmoji}>👨‍🔧</Text>
+        {/* ================= STATS ================= */}
+        <View style={styles.statsCard}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{experience}</Text>
+            <Text style={styles.statLabel}>Experience</Text>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{completedJobs}</Text>
+            <Text style={styles.statLabel}>Jobs Done</Text>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>৳{price}</Text>
+            <Text style={styles.statLabel}>Starting</Text>
+          </View>
         </View>
 
-        <Text style={styles.name}>{worker?.name}</Text>
-
-        <Text style={styles.rating}>
-          ⭐ {worker?.rating ?? 0}
-        </Text>
-
-        <Text style={styles.location}>
-          📍 {worker?.city}
-        </Text>
-
-        <Text style={styles.info}>
-          💼 {worker?.experience}
-        </Text>
-
-        <Text style={styles.info}>
-          ✅ {worker?.completedJobs} Jobs Completed
-        </Text>
-
-        {/* About */}
+        {/* ================= ABOUT ================= */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
-
-          <Text style={styles.description}>
-            {worker?.about ??
-              "Professional service provider with quality work and customer satisfaction."}
-          </Text>
+          <View style={styles.card}>
+            <Text style={styles.description}>{about}</Text>
+          </View>
         </View>
 
-        {/* Buttons */}
-        <View style={styles.buttonRow}>
-          <TouchableOpacity style={styles.chatButton}>
-            <Text style={styles.buttonText}>Chat</Text>
-          </TouchableOpacity>
+        {/* ================= DETAILS ================= */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Details</Text>
+          <View style={styles.card}>
+            <View style={styles.detailRow}>
+              <View style={styles.detailIcon}>
+                <Ionicons
+                  name="briefcase-outline"
+                  size={18}
+                  color={COLORS.primary}
+                />
+              </View>
+              <View style={styles.detailTextBox}>
+                <Text style={styles.detailLabel}>Category</Text>
+                <Text style={styles.detailValue}>
+                  {worker.category || "General"}
+                </Text>
+              </View>
+            </View>
 
-          <TouchableOpacity style={styles.callButton}>
-            <Text style={styles.buttonText}>Call</Text>
-          </TouchableOpacity>
+            <View style={styles.divider} />
+
+            <View style={styles.detailRow}>
+              <View style={styles.detailIcon}>
+                <Ionicons
+                  name="cash-outline"
+                  size={18}
+                  color={COLORS.primary}
+                />
+              </View>
+              <View style={styles.detailTextBox}>
+                <Text style={styles.detailLabel}>Service Charge</Text>
+                <Text style={styles.detailValue}>From ৳{price}</Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.detailRow}>
+              <View style={styles.detailIcon}>
+                <Ionicons
+                  name="location-outline"
+                  size={18}
+                  color={COLORS.primary}
+                />
+              </View>
+              <View style={styles.detailTextBox}>
+                <Text style={styles.detailLabel}>Service Area</Text>
+                <Text style={styles.detailValue}>{city}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* ================= QUICK ACTIONS ================= */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.chatBtn]}
+              onPress={handleChat}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
+              <Text style={styles.actionText}>Chat</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.callBtn]}
+              onPress={handleCall}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="call" size={18} color="#fff" />
+              <Text style={styles.actionText}>Call</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* ================= BOTTOM BOOK ================= */}
+      <View
+        style={[
+          styles.bottomBar,
+          { paddingBottom: Math.max(insets.bottom, 14) },
+        ]}
+      >
+        <View style={styles.priceBox}>
+          <Text style={styles.priceLabel}>Starting from</Text>
+          <Text style={styles.priceValue}>৳{price}</Text>
         </View>
 
         <TouchableOpacity
           style={styles.bookButton}
-          onPress={() =>
-            router.push({
-              pathname: "/customer/post-job",
-              params: {
-                workerId: worker.id,
-                category: worker.category,
-              },
-            })
-          }
+          onPress={handleBook}
+          activeOpacity={0.85}
         >
-          <Text style={styles.bookText}>
-            Book Now • ৳{worker?.price}
-          </Text>
+          <Text style={styles.bookText}>Book Now</Text>
+          <Ionicons name="arrow-forward" size={18} color="#fff" />
         </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: "#F8FAFC",
   },
 
-  header: {
+  loading: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    gap: 10,
+  },
+
+  loadingText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+
+  backLink: {
+    marginTop: 8,
+    color: COLORS.primary,
+    fontWeight: "700",
+  },
+
+  hero: {
+    backgroundColor: COLORS.primary,
+    paddingBottom: 28,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+
+  topBar: {
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  iconBtnPlaceholder: {
+    width: 40,
+    height: 40,
+  },
+
+  heroTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  profileBlock: {
+    alignItems: "center",
+    marginTop: 18,
     paddingHorizontal: 20,
-    paddingTop: 20,
+  },
+
+  avatarWrap: {
+    position: "relative",
   },
 
   avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "#EEF4FF",
+    width: 104,
+    height: 104,
+    borderRadius: 28,
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.35)",
+    backgroundColor: "#DBEAFE",
+  },
+
+  avatarFallback: {
     justifyContent: "center",
     alignItems: "center",
-    alignSelf: "center",
-    marginTop: 20,
   },
 
   avatarEmoji: {
-    fontSize: 60,
+    fontSize: 48,
+  },
+
+  onlineDot: {
+    position: "absolute",
+    right: 4,
+    bottom: 4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#22C55E",
+    borderWidth: 2,
+    borderColor: "#fff",
   },
 
   name: {
-    marginTop: 20,
-    fontSize: 26,
-    fontWeight: "700",
-    textAlign: "center",
-    color: COLORS.text,
+    marginTop: 14,
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#fff",
   },
 
-  rating: {
+  ratingRow: {
     marginTop: 8,
-    textAlign: "center",
-    color: "#F59E0B",
-    fontWeight: "700",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 
-  location: {
-    marginTop: 8,
-    textAlign: "center",
-    color: COLORS.textSecondary,
+  ratingText: {
+    color: "#FDE68A",
+    fontWeight: "800",
+    fontSize: 14,
   },
 
-  info: {
+  ratingSub: {
+    color: "rgba(255,255,255,0.85)",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+
+  locationRow: {
     marginTop: 8,
-    textAlign: "center",
-    color: COLORS.textSecondary,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  locationText: {
+    color: "#DBEAFE",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+
+  statsCard: {
+    marginTop: -18,
+    marginHorizontal: 20,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+
+  statValue: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+
+  statLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#94A3B8",
+  },
+
+  statDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: "#E2E8F0",
   },
 
   section: {
-    marginTop: 35,
+    marginTop: 22,
     paddingHorizontal: 20,
   },
 
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 12,
-    color: COLORS.text,
+    marginBottom: 10,
+    marginLeft: 2,
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
 
   description: {
+    fontSize: 15,
     lineHeight: 24,
-    color: COLORS.textSecondary,
+    color: "#475569",
   },
 
-  buttonRow: {
+  detailRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    marginTop: 35,
-  },
-
-  chatButton: {
-    flex: 1,
-    backgroundColor: COLORS.primary,
-    height: 50,
-    borderRadius: 14,
-    justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
   },
 
-  callButton: {
-    flex: 1,
-    backgroundColor: "#22C55E",
-    height: 50,
-    borderRadius: 14,
+  detailIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "#EFF6FF",
     justifyContent: "center",
     alignItems: "center",
   },
 
-  buttonText: {
-    color: "#fff",
+  detailTextBox: {
+    marginLeft: 12,
+    flex: 1,
+  },
+
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#94A3B8",
+  },
+
+  detailValue: {
+    marginTop: 2,
+    fontSize: 15,
     fontWeight: "700",
+    color: "#0F172A",
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginVertical: 12,
+  },
+
+  actionRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+
+  actionBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+
+  chatBtn: {
+    backgroundColor: COLORS.primary,
+  },
+
+  callBtn: {
+    backgroundColor: "#16A34A",
+  },
+
+  actionText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 15,
+  },
+
+  bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  priceBox: {
+    flex: 1,
+  },
+
+  priceLabel: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontWeight: "600",
+  },
+
+  priceValue: {
+    marginTop: 2,
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#16A34A",
   },
 
   bookButton: {
-    marginHorizontal: 20,
-    marginTop: 30,
-    marginBottom: 40,
-    backgroundColor: "#FF6B00",
-    height: 56,
-    borderRadius: 16,
-    justifyContent: "center",
+    flex: 1.2,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
 
   bookText: {
     color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "800",
   },
 });

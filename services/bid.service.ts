@@ -1,4 +1,4 @@
-import api from "./api";
+import api from "@/config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 async function getToken() {

@@ -39,6 +39,15 @@ export default function WorkerTabs() {
             <Ionicons name="briefcase" size={size} color={color} />
           ),
         }}
+      /> 
+      <Tabs.Screen
+        name="post"
+        options={{
+          title: "post",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="briefcase" size={size} color={color} />
+          ),
+        }}
       />
 
       <Tabs.Screen

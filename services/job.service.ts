@@ -1,4 +1,4 @@
-import api from "./api";
+import api from "@/config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /* ===========================
@@ -27,6 +27,8 @@ export async function createJob(data: {
   budget: number;
   address: string;
   city: string;
+  phone?: string;
+  urgency?: "normal" | "urgent";
   image?: string;
 }) {
   const token = await getToken();
@@ -145,6 +147,8 @@ export async function updateJob(
     budget?: number;
     address?: string;
     city?: string;
+    phone?: string;
+    urgency?: "normal" | "urgent";
     image?: string;
     status?: string;
   }

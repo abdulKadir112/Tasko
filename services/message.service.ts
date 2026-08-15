@@ -1,5 +1,7 @@
-import api from "./api";
+
+import api from "@/config/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { randomUUID } from "expo-crypto";
 
 import {
   collection,
@@ -12,7 +14,7 @@ import {
 import { db } from "@/config/firebase";
 
 /* =========================================================
-   TYPES
+TYPES
 ========================================================= */
 
 export type MessageType =
@@ -44,117 +46,207 @@ export interface SendMessageData {
   fileUrl?: string | null;
 
   /*
-   * ⭐ VERY IMPORTANT
+   * ⭐ UNIQUE CLIENT MESSAGE ID
    *
-   * প্রতিটি message-এর জন্য frontend থেকে
-   * একটি unique ID আসবে।
-   *
-   * Network retry হলেও এই ID একই থাকবে।
+   * একই message retry / optimistic update /
+   * Firebase sync হলেও এই ID একই থাকবে।
    */
-  clientMessageId: string;
+  clientMessageId?: string | null;
 
   replyTo?: ReplyTo | null;
 }
 
 /* =========================================================
-   TOKEN
+TOKEN
 ========================================================= */
 
 async function getToken(): Promise<string> {
-  const token = await AsyncStorage.getItem("token");
+  const token =
+    await AsyncStorage.getItem("token");
 
   if (!token) {
-    throw new Error("User not logged in");
+    throw new Error(
+      "User not logged in"
+    );
   }
 
   return token;
 }
 
 /* =========================================================
-   GET ALL MESSAGES
+CLIENT MESSAGE ID
+========================================================= */
+
+function normalizeClientMessageId(
+  value?: string | null
+): string {
+  if (value) {
+    const normalized =
+      String(value).trim();
+
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  /*
+   * Caller ID না দিলে এখানেই একটি নতুন
+   * permanent client ID তৈরি হবে।
+   */
+  return randomUUID();
+}
+
+/* =========================================================
+GET ALL MESSAGES
 ========================================================= */
 
 export async function getMessages(
   chatId: string
 ) {
-  const token = await getToken();
+  const token =
+    await getToken();
 
-  const response = await api.get(
-    `/messages/${chatId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  const response =
+    await api.get(
+      `/messages/${String(chatId)}`,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${token}`,
+        },
+      }
+    );
 
-  return response.data.data;
+  return response.data?.data ?? [];
 }
 
 /* =========================================================
-   REALTIME FIREBASE LISTENER
+REALTIME FIREBASE LISTENER
 ========================================================= */
 
 export function listenMessages(
   chatId: string,
-  callback: (messages: any[]) => void
+  callback: (
+    messages: any[]
+  ) => void
 ) {
+  const normalizedChatId =
+    String(chatId);
+
   const q = query(
-    collection(db, "messages"),
+    collection(
+      db,
+      "messages"
+    ),
 
     where(
       "chatId",
       "==",
-      String(chatId)
+      normalizedChatId
     ),
 
-    orderBy("createdAt", "asc")
+    orderBy(
+      "createdAt",
+      "asc"
+    )
   );
 
-  const unsubscribe = onSnapshot(
-    q,
+  const unsubscribe =
+    onSnapshot(
+      q,
 
-    (snapshot) => {
-      const messages = snapshot.docs.map(
-        (doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })
-      );
+      (snapshot) => {
+        const messages =
+          snapshot.docs.map(
+            (doc) => {
+              const data =
+                doc.data();
 
-      callback(messages);
-    },
+              /*
+               * ⭐ IMPORTANT
+               *
+               * Firebase document ID এবং
+               * clientMessageId দুটোই preserve করছি।
+               */
 
-    (error) => {
-      console.log(
-        "❌ Firestore Listener Error:",
-        error
-      );
-    }
-  );
+              return {
+                id: String(
+                  doc.id
+                ),
+
+                ...data,
+
+                clientMessageId:
+                  data?.clientMessageId
+                    ? String(
+                        data.clientMessageId
+                      ).trim()
+                    : null,
+              };
+            }
+          );
+
+        callback(messages);
+      },
+
+      (error) => {
+        console.log(
+          "❌ Firestore Listener Error:",
+          error
+        );
+      }
+    );
 
   return unsubscribe;
 }
 
 /* =========================================================
-   SEND MESSAGE
+SEND MESSAGE
 ========================================================= */
 
 export async function sendMessage(
   data: SendMessageData
 ) {
-  const token = await getToken();
+  const token =
+    await getToken();
+
+  /*
+   * ======================================================
+   * ⭐ CRITICAL DUPLICATE PROTECTION
+   * ======================================================
+   *
+   * Caller আগে clientMessageId দিলে
+   * সেটাই ব্যবহার হবে।
+   *
+   * Caller না দিলে service নতুন ID বানাবে।
+   *
+   * কিন্তু retry করার সময় caller-এর
+   * একই ID আবার পাঠানো খুব গুরুত্বপূর্ণ।
+   */
+
+  const clientMessageId =
+    normalizeClientMessageId(
+      data.clientMessageId
+    );
+
+  /*
+   * ======================================================
+   * PAYLOAD
+   * ======================================================
+   */
 
   const payload = {
-    chatId: String(data.chatId),
+    chatId:
+      String(data.chatId),
 
-    receiverId: String(
-      data.receiverId
-    ),
+    receiverId:
+      String(data.receiverId),
 
-    message: data.message ?? "",
+    message:
+      data.message ?? "",
 
-    type: data.type ?? "text",
+    type:
+      data.type ?? "text",
 
     imageUrl:
       data.imageUrl ?? null,
@@ -166,10 +258,9 @@ export async function sendMessage(
       data.fileUrl ?? null,
 
     /*
-     * ⭐ Duplicate protection
+     * ⭐ MUST SEND TO BACKEND
      */
-    clientMessageId:
-      data.clientMessageId,
+    clientMessageId,
 
     replyTo:
       data.replyTo ?? null,
@@ -180,42 +271,101 @@ export async function sendMessage(
     payload
   );
 
-  const response = await api.post(
-    "/messages",
-    payload,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  /*
+   * ======================================================
+   * API REQUEST
+   * ======================================================
+   */
+
+  const response =
+    await api.post(
+      "/messages",
+      payload,
+      {
+        headers: {
+          Authorization:
+            `Bearer ${token}`,
+
+          "Content-Type":
+            "application/json",
+        },
+      }
+    );
 
   console.log(
     "✅ Message sent:",
     response.data
   );
 
-  return response.data.data;
+  /*
+   * ======================================================
+   * SERVER RESPONSE
+   * ======================================================
+   */
+
+  const serverMessage =
+    response.data?.data;
+
+  /*
+   * ======================================================
+   * IMPORTANT
+   *
+   * Backend যদি clientMessageId return না করে,
+   * তাহলে local response-এ caller-এর ID
+   * আবার বসিয়ে দিচ্ছি।
+   * ======================================================
+   */
+
+  if (
+    serverMessage &&
+    typeof serverMessage ===
+      "object"
+  ) {
+    return {
+      ...serverMessage,
+
+      clientMessageId:
+        serverMessage
+          ?.clientMessageId ??
+        clientMessageId,
+    };
+  }
+
+  /*
+   * Server data না থাকলেও
+   * অন্তত clientMessageId হারাবে না।
+   */
+
+  return {
+    ...(serverMessage ?? {}),
+
+    clientMessageId,
+  };
 }
 
 /* =========================================================
-   MARK MESSAGES AS SEEN
+MARK MESSAGES AS SEEN
 ========================================================= */
 
 export async function seenMessages(
   chatId: string
 ) {
-  const token = await getToken();
+  const token =
+    await getToken();
 
-  const response = await api.put(
-    `/messages/seen/${chatId}`,
-    {},
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+  const response =
+    await api.put(
+      `/messages/seen/${String(
+        chatId
+      )}`,
+      {},
+      {
+        headers: {
+          Authorization:
+            `Bearer ${token}`,
+        },
+      }
+    );
 
   return response.data;
-}
+};

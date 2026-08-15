@@ -17,11 +17,40 @@ type Props = {
   onChange: (uri: string) => void;
 };
 
+function extractImageUrl(result: any): string {
+  if (!result) return "";
+
+  if (typeof result === "string") {
+    return result.trim();
+  }
+
+  if (typeof result === "object") {
+    const url =
+      result.url ??
+      result.secure_url ??
+      result.imageUrl ??
+      result.photoURL ??
+      result.data?.url ??
+      result.data?.secure_url ??
+      result.data?.imageUrl ??
+      "";
+
+    return typeof url === "string" ? url.trim() : "";
+  }
+
+  return "";
+}
+
 export default function ProfileImagePicker({
   image,
   onChange,
 }: Props) {
   const [loading, setLoading] = useState(false);
+
+  const safeImage =
+    typeof image === "string" && image.trim().length > 0
+      ? image.trim()
+      : "https://i.pravatar.cc/300";
 
   async function pickImage() {
     try {
@@ -30,25 +59,37 @@ export default function ProfileImagePicker({
 
       if (!permission.granted) return;
 
-      const result =
-        await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ["images"],
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.8,
-        });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-      if (!result.canceled) {
-        setLoading(true);
+      if (result.canceled) return;
 
-        const imageUrl = await uploadImage(
-          result.assets[0].uri
-        );
+      setLoading(true);
 
-        onChange(imageUrl); // ✅ uploaded URL only
+      const pickedUri = result.assets[0].uri;
+
+      console.log("🖼️ Picked URI:", pickedUri);
+
+      const uploaded = await uploadImage(pickedUri);
+
+      console.log("🖼️ Upload result:", uploaded);
+
+      const imageUrl = extractImageUrl(uploaded);
+
+      console.log("🖼️ Final image URL:", imageUrl);
+
+      if (!imageUrl) {
+        console.log("❌ No valid image URL from upload");
+        return;
       }
+
+      onChange(imageUrl);
     } catch (e) {
-      console.log(e);
+      console.log("❌ Profile image pick/upload error:", e);
     } finally {
       setLoading(false);
     }
@@ -56,29 +97,28 @@ export default function ProfileImagePicker({
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={pickImage}>
+      <TouchableOpacity onPress={pickImage} disabled={loading}>
         <Image
           source={{
-            uri: image || "https://i.pravatar.cc/300",
+            uri: safeImage,
           }}
           style={styles.avatar}
         />
 
         <View style={styles.camera}>
-          <Ionicons name="camera" size={18} color="#fff" />
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="camera" size={18} color="#fff" />
+          )}
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={pickImage}>
-        <Text style={styles.text}>Change Photo</Text>
+      <TouchableOpacity onPress={pickImage} disabled={loading}>
+        <Text style={styles.text}>
+          {loading ? "Uploading..." : "Change Photo"}
+        </Text>
       </TouchableOpacity>
-
-      {loading && (
-        <ActivityIndicator
-          style={{ marginTop: 10 }}
-          color={COLORS.primary}
-        />
-      )}
     </View>
   );
 }

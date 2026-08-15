@@ -1,107 +1,219 @@
-import api from "./api";
-import mime from "mime";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import api from "@/config/api";
 
-async function getToken() {
-  const token = await AsyncStorage.getItem("token");
-
-  if (!token) {
-    throw new Error("User not logged in");
-  }
-
-  return token;
-}
-
-async function uploadFile(
+/**
+ * Upload image to backend
+ *
+ * Backend endpoint:
+ * POST /api/upload/image
+ *
+ * Backend expects:
+ * upload.single("image")
+ */
+export async function uploadImage(
   uri: string,
-  fieldName: "image" | "voice" | "document"
-): Promise<string> {
+  fileName?: string,
+  mimeType?: string
+) {
   try {
-    const token = await getToken();
+    const name =
+      fileName || `image_${Date.now()}.jpg`;
 
-    const mimeType =
-      mime.getType(uri) || "application/octet-stream";
-
-    const extension =
-      mime.getExtension(mimeType) || "dat";
+    const type =
+      mimeType || "image/jpeg";
 
     const formData = new FormData();
 
-    formData.append(fieldName, {
+    formData.append("image", {
       uri,
-      name: `${fieldName}_${Date.now()}.${extension}`,
-      type: mimeType,
+      name,
+      type,
     } as any);
 
-    console.log("📤 Uploading:", uri);
-    console.log("📂 Type:", fieldName);
-
-    // IMPORTANT
-    const endpoint = `/upload/${fieldName}`;
+    console.log("==========================================");
+    console.log("📤 IMAGE UPLOAD START");
+    console.log("📂 Field: image");
+    console.log("📁 URI:", uri);
+    console.log("📄 File:", name);
+    console.log("🎵 MIME:", type);
+    console.log(
+      "🌐 API BASE URL:",
+      api.defaults.baseURL
+    );
+    console.log(
+      "🌐 UPLOAD ENDPOINT:",
+      "/upload/image"
+    );
+    console.log(
+      "🌐 FULL URL:",
+      `${api.defaults.baseURL}/upload/image`
+    );
+    console.log("==========================================");
 
     const response = await api.post(
-      endpoint,
+      "/upload/image",
       formData,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
           "Content-Type": "multipart/form-data",
         },
+
+        // Important for React Native multipart uploads
+        transformRequest: (data) => data,
       }
     );
 
-    console.log("✅ Upload Success:", response.data);
+    console.log("==========================================");
+    console.log("✅ IMAGE UPLOAD SUCCESS");
+    console.log("📦 RESPONSE:", response.data);
+    console.log("==========================================");
 
-    if (!response.data?.success) {
-      throw new Error(
-        response.data?.message || "Upload failed"
+    return response.data;
+  } catch (error: any) {
+    console.log("==========================================");
+    console.log("❌ IMAGE UPLOAD ERROR");
+
+    if (error.response) {
+      console.log(
+        "📡 STATUS:",
+        error.response.status
+      );
+
+      console.log(
+        "📡 RESPONSE:",
+        error.response.data
+      );
+    } else {
+      console.log(
+        "❌ MESSAGE:",
+        error.message
       );
     }
 
-    // Backend compatible
-    return (
-      response.data.data?.url ||
-      response.data.data?.imageUrl ||
-      response.data.data?.voiceUrl ||
-      response.data.data?.documentUrl ||
-      response.data.url ||
-      response.data.imageUrl ||
-      response.data.voiceUrl ||
-      response.data.documentUrl
+    console.log("==========================================");
+
+    throw error;
+  }
+}
+
+
+/**
+ * Upload voice to backend
+ *
+ * Backend expects:
+ * upload.single("voice")
+ */
+export async function uploadVoice(
+  uri: string,
+  fileName?: string,
+  mimeType?: string
+) {
+  try {
+    const name =
+      fileName || `voice_${Date.now()}.m4a`;
+
+    const type =
+      mimeType || "audio/m4a";
+
+    const formData = new FormData();
+
+    formData.append("voice", {
+      uri,
+      name,
+      type,
+    } as any);
+
+    console.log("🎤 VOICE UPLOAD START");
+    console.log("URI:", uri);
+    console.log("File:", name);
+    console.log("MIME:", type);
+
+    const response = await api.post(
+      "/upload/voice",
+      formData,
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "multipart/form-data",
+        },
+
+        transformRequest: (data) => data,
+      }
     );
+
+    console.log(
+      "✅ VOICE UPLOAD SUCCESS:",
+      response.data
+    );
+
+    return response.data;
   } catch (error: any) {
     console.log(
-      "❌ Upload Error:",
-      error?.response?.data || error.message
+      "❌ VOICE UPLOAD ERROR:",
+      error.response?.data || error.message
     );
 
     throw error;
   }
 }
 
-/**
- * IMAGE
- */
-export async function uploadImage(
-  imageUri: string
-): Promise<string> {
-  return uploadFile(imageUri, "image");
-}
 
 /**
- * VOICE
- */
-export async function uploadVoice(
-  voiceUri: string
-): Promise<string> {
-  return uploadFile(voiceUri, "voice");
-}
-
-/**
- * DOCUMENT
+ * Upload document to backend
+ *
+ * Backend expects:
+ * upload.single("document")
  */
 export async function uploadDocument(
-  documentUri: string
-): Promise<string> {
-  return uploadFile(documentUri, "document");
+  uri: string,
+  fileName?: string,
+  mimeType?: string
+) {
+  try {
+    const name =
+      fileName || `document_${Date.now()}`;
+
+    const type =
+      mimeType || "application/pdf";
+
+    const formData = new FormData();
+
+    formData.append("document", {
+      uri,
+      name,
+      type,
+    } as any);
+
+    console.log("📄 DOCUMENT UPLOAD START");
+    console.log("URI:", uri);
+    console.log("File:", name);
+    console.log("MIME:", type);
+
+    const response = await api.post(
+      "/upload/document",
+      formData,
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "multipart/form-data",
+        },
+
+        transformRequest: (data) => data,
+      }
+    );
+
+    console.log(
+      "✅ DOCUMENT UPLOAD SUCCESS:",
+      response.data
+    );
+
+    return response.data;
+  } catch (error: any) {
+    console.log(
+      "❌ DOCUMENT UPLOAD ERROR:",
+      error.response?.data || error.message
+    );
+
+    throw error;
+  }
 }

@@ -12,7 +12,7 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
-import api from "@/services/api";
+import api from "@/config/api";
 import ServiceCard from "@/components/home/ServiceCard";
 import { COLORS } from "@/theme";
 

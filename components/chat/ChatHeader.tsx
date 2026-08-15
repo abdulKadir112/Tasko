@@ -1,5 +1,4 @@
 import React from "react";
-
 import {
   View,
   Text,
@@ -7,16 +6,14 @@ import {
   TouchableOpacity,
   Image,
 } from "react-native";
-
 import { Ionicons } from "@expo/vector-icons";
-
 import { router } from "expo-router";
 
 import { COLORS } from "@/theme";
 
 type Props = {
-  name: string;
-  photoURL?: string;
+  name?: string | null;
+  photoURL?: string | null;
   online?: boolean;
   lastSeen?: string;
   onAudioCall?: () => void;
@@ -31,13 +28,50 @@ export default function ChatHeader({
   onAudioCall,
   onVideoCall,
 }: Props) {
+  /*
+   * PROFILE NAME
+   *
+   * কখনো Loading দেখাবে না।
+   * Name না থাকলে সরাসরি Unknown User।
+   */
+  const displayName =
+    typeof name === "string" && name.trim().length > 0
+      ? name.trim()
+      : "Unknown User";
+
+  /*
+   * PROFILE PHOTO
+   *
+   * Photo না থাকলে placeholder দেখাবে।
+   * কোনো loading indicator নেই।
+   */
+  const displayPhoto =
+    typeof photoURL === "string" && photoURL.trim().length > 0
+      ? photoURL.trim()
+      : null;
+
+  /*
+   * STATUS
+   */
+  const displayStatus =
+    online === true
+      ? "Online"
+      : typeof lastSeen === "string" && lastSeen.trim().length > 0
+        ? lastSeen.trim()
+        : "Offline";
+
   return (
     <View style={styles.container}>
-      {/* Left */}
+      {/* =========================
+          LEFT
+      ========================= */}
 
       <View style={styles.left}>
+        {/* Back */}
         <TouchableOpacity
           onPress={() => router.back()}
+          style={styles.backButton}
+          activeOpacity={0.7}
         >
           <Ionicons
             name="arrow-back"
@@ -46,13 +80,13 @@ export default function ChatHeader({
           />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.profile}>
-          {photoURL ? (
+        {/* Profile */}
+        <View style={styles.profile}>
+          {displayPhoto ? (
             <Image
-              source={{
-                uri: photoURL,
-              }}
+              source={{ uri: displayPhoto }}
               style={styles.avatar}
+              resizeMode="cover"
             />
           ) : (
             <View style={styles.placeholder}>
@@ -67,25 +101,29 @@ export default function ChatHeader({
           <View style={styles.info}>
             <Text
               numberOfLines={1}
+              ellipsizeMode="tail"
               style={styles.name}
             >
-              {name}
+              {displayName}
             </Text>
 
             <Text style={styles.status}>
-              {online
-                ? "Online"
-                : lastSeen || "Offline"}
+              {displayStatus}
             </Text>
           </View>
-        </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Right */}
+      {/* =========================
+          RIGHT
+      ========================= */}
 
       <View style={styles.right}>
+        {/* Audio Call */}
         <TouchableOpacity
           onPress={onAudioCall}
+          style={styles.actionButton}
+          activeOpacity={0.7}
         >
           <Ionicons
             name="call-outline"
@@ -94,9 +132,11 @@ export default function ChatHeader({
           />
         </TouchableOpacity>
 
+        {/* Video Call */}
         <TouchableOpacity
-          style={styles.icon}
           onPress={onVideoCall}
+          style={styles.actionButton}
+          activeOpacity={0.7}
         >
           <Ionicons
             name="videocam-outline"
@@ -105,7 +145,11 @@ export default function ChatHeader({
           />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.icon}>
+        {/* More */}
+        <TouchableOpacity
+          style={styles.actionButton}
+          activeOpacity={0.7}
+        >
           <Ionicons
             name="ellipsis-vertical"
             size={22}
@@ -130,6 +174,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
 
     elevation: 3,
+
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
   },
 
   left: {
@@ -137,22 +189,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
 
     flex: 1,
+    minWidth: 0,
+  },
+
+  backButton: {
+    width: 38,
+    height: 44,
+
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   profile: {
-    marginLeft: 12,
+    marginLeft: 6,
 
     flexDirection: "row",
     alignItems: "center",
 
     flex: 1,
+    minWidth: 0,
   },
 
   avatar: {
     width: 44,
     height: 44,
-
     borderRadius: 22,
+
+    backgroundColor: "#ffffff30",
   },
 
   placeholder: {
@@ -168,16 +231,16 @@ const styles = StyleSheet.create({
   },
 
   info: {
-    marginLeft: 12,
+    marginLeft: 10,
 
     flex: 1,
+    minWidth: 0,
   },
 
   name: {
     color: "#fff",
 
     fontWeight: "700",
-
     fontSize: 17,
   },
 
@@ -192,9 +255,17 @@ const styles = StyleSheet.create({
   right: {
     flexDirection: "row",
     alignItems: "center",
+
+    marginLeft: 8,
   },
 
-  icon: {
-    marginLeft: 18,
+  actionButton: {
+    width: 38,
+    height: 44,
+
+    justifyContent: "center",
+    alignItems: "center",
+
+    marginLeft: 4,
   },
 });

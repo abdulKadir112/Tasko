@@ -9,6 +9,10 @@ export default function WorkerLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="edit-profile" />
+      <Stack.Screen name="job-details" />
+      <Stack.Screen name="my-bids" />
+      <Stack.Screen name="my-services" />
     </Stack>
   );
 }

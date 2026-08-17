@@ -7,10 +7,8 @@ export default function WorkerTabs() {
     <Tabs
       screenOptions={{
         headerShown: false,
-
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: "#9CA3AF",
-
         tabBarStyle: {
           height: 70,
           paddingBottom: 8,
@@ -18,6 +16,10 @@ export default function WorkerTabs() {
           borderTopWidth: 0,
           elevation: 10,
           backgroundColor: "#fff",
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "600",
         },
       }}
     >
@@ -39,13 +41,18 @@ export default function WorkerTabs() {
             <Ionicons name="briefcase" size={size} color={color} />
           ),
         }}
-      /> 
+      />
+
       <Tabs.Screen
         name="post"
         options={{
-          title: "post",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="briefcase" size={size} color={color} />
+          title: "Post",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "add-circle" : "add-circle-outline"}
+              size={size + 4}
+              color={focused ? COLORS.primary : color}
+            />
           ),
         }}
       />

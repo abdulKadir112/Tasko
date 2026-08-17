@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/theme";
 import { getMyProfile } from "@/services/user.service";
+import { updateMyLocation } from "@/services/location.service";
 import { useAuthContext } from "@/context/AuthContext";
 
 type MenuItem = {
@@ -34,6 +35,7 @@ export default function ProfileScreen() {
 
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [updatingLocation, setUpdatingLocation] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -51,6 +53,22 @@ export default function ProfileScreen() {
       Alert.alert("Error", "Failed to load profile.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleUpdateLocation() {
+    try {
+      setUpdatingLocation(true);
+      const coords = await updateMyLocation();
+      Alert.alert(
+        "Location Updated",
+        `Lat ${coords.lat.toFixed(4)}, Lng ${coords.lng.toFixed(4)}`
+      );
+      await loadProfile();
+    } catch (e: any) {
+      Alert.alert("Error", e?.message || "Failed to update location");
+    } finally {
+      setUpdatingLocation(false);
     }
   }
 
@@ -105,9 +123,10 @@ export default function ProfileScreen() {
   const rating = Number(user?.rating ?? 5).toFixed(1);
   const completedJobs = user?.completedJobs ?? 0;
   const experience = user?.experience || "N/A";
-  const skills: string[] = Array.isArray(user?.skills)
-    ? user.skills
-    : [];
+  const skills: string[] = Array.isArray(user?.skills) ? user.skills : [];
+
+  const hasLocation =
+    typeof user?.lat === "number" && typeof user?.lng === "number";
 
   const accountMenu: MenuItem[] = [
     {
@@ -129,6 +148,26 @@ export default function ProfileScreen() {
 
   const workMenu: MenuItem[] = [
     {
+      id: "services",
+      icon: "storefront-outline",
+      title: "My Services",
+      subtitle: "Published gigs & packages",
+      onPress: () => router.push("/worker/my-services"),
+    },
+    {
+      id: "location",
+      icon: "locate-outline",
+      title: updatingLocation ? "Updating..." : "Update Location",
+      subtitle: hasLocation
+        ? "Location shared with customers"
+        : "Share GPS so customers see distance",
+      onPress: () => {
+        if (!updatingLocation) {
+          handleUpdateLocation();
+        }
+      },
+    },
+    {
       id: "jobs",
       icon: "briefcase-outline",
       title: "My Jobs",
@@ -140,7 +179,7 @@ export default function ProfileScreen() {
       icon: "chatbubbles-outline",
       title: "Messages",
       subtitle: "Chat with customers",
-      onPress: () => router.push("/shared/chat"),
+      onPress: () => router.push("/worker/(tabs)/messages"),
     },
     {
       id: "earnings",
@@ -166,8 +205,7 @@ export default function ProfileScreen() {
       icon: "help-circle-outline",
       title: "Help & Support",
       subtitle: "FAQs and contact support",
-      onPress: () =>
-        Alert.alert("Support", "Email us at support@tasko.app"),
+      onPress: () => Alert.alert("Support", "Email us at support@tasko.app"),
     },
     {
       id: "about",
@@ -175,7 +213,10 @@ export default function ProfileScreen() {
       title: "About Tasko",
       subtitle: "App version & info",
       onPress: () =>
-        Alert.alert("Tasko Worker", "Version 1.0.0\nGrow your service business."),
+        Alert.alert(
+          "Tasko Worker",
+          "Version 1.0.0\nGrow your service business."
+        ),
     },
   ];
 
@@ -206,10 +247,7 @@ export default function ProfileScreen() {
               onPress={item.onPress}
             >
               <View
-                style={[
-                  styles.menuIcon,
-                  item.danger && styles.menuIconDanger,
-                ]}
+                style={[styles.menuIcon, item.danger && styles.menuIconDanger]}
               >
                 <Ionicons
                   name={item.icon}
@@ -252,7 +290,6 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
       >
-        {/* ================= HEADER ================= */}
         <View style={[styles.hero, { paddingTop: insets.top + 12 }]}>
           <View style={styles.heroTop}>
             <Text style={styles.heroLabel}>Worker Profile</Text>
@@ -287,7 +324,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ================= STATS ================= */}
         <View style={styles.statsCard}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{rating}</Text>
@@ -305,7 +341,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ================= INFO ================= */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Professional Info</Text>
           <View style={styles.infoCard}>
@@ -322,6 +357,16 @@ export default function ProfileScreen() {
             />
             <View style={styles.divider} />
             <InfoRow
+              icon="navigate-outline"
+              label="GPS Location"
+              value={
+                hasLocation
+                  ? `${Number(user.lat).toFixed(4)}, ${Number(user.lng).toFixed(4)}`
+                  : "Not shared"
+              }
+            />
+            <View style={styles.divider} />
+            <InfoRow
               icon="briefcase-outline"
               label="Category"
               value={user?.category || "Not added"}
@@ -335,7 +380,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ================= SKILLS ================= */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Skills</Text>
           <View style={styles.skillsCard}>
@@ -353,7 +397,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ================= ABOUT ================= */}
         {!!user?.about && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About</Text>
@@ -363,7 +406,6 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* ================= MENUS ================= */}
         {renderMenu("Account", accountMenu)}
         {renderMenu("Work", workMenu)}
         {renderMenu("Support", supportMenu)}
@@ -727,4 +769,4 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     fontWeight: "600",
   },
-}); 
+});

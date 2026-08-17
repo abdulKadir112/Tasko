@@ -17,15 +17,24 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getWorkerById } from "@/services/worker.service";
+import { getServices } from "@/services/service.service";
 import { COLORS } from "@/theme";
 
 export default function WorkerProfile() {
-  const { id } = useLocalSearchParams();
+  const {
+    id,
+    serviceId: paramServiceId,
+    serviceTitle: paramServiceTitle,
+    servicePrice: paramServicePrice,
+    serviceCategory: paramServiceCategory,
+  } = useLocalSearchParams();
+
   const insets = useSafeAreaInsets();
 
   const workerId = Array.isArray(id) ? id[0] : id;
 
   const [worker, setWorker] = useState<any>(null);
+  const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,10 +46,33 @@ export default function WorkerProfile() {
   async function loadWorker() {
     try {
       setLoading(true);
+
       const res = await getWorkerById(String(workerId));
-      setWorker(res.data);
+      const workerData = res?.data ?? res;
+      setWorker(workerData);
+
+      // Worker এর published services load
+      try {
+        const serviceRes = await getServices({
+          workerId: String(workerId),
+        });
+
+        const list = Array.isArray(serviceRes?.data)
+          ? serviceRes.data
+          : Array.isArray(serviceRes)
+            ? serviceRes
+            : [];
+
+        setServices(
+          list.filter((s: any) => s?.isActive !== false)
+        );
+      } catch (e) {
+        console.log("Worker services load error:", e);
+        setServices([]);
+      }
     } catch (error) {
-      console.log(error);
+      console.log("GET WORKER ERROR =", error);
+      Alert.alert("Error", "Unable to load worker profile");
     } finally {
       setLoading(false);
     }
@@ -55,18 +87,27 @@ export default function WorkerProfile() {
     }
 
     const url = `tel:${phone}`;
-    const canOpen = await Linking.canOpenURL(url);
 
-    if (!canOpen) {
-      Alert.alert("Error", "Cannot open phone dialer");
-      return;
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+
+      if (!canOpen) {
+        Alert.alert("Error", "Cannot open phone dialer");
+        return;
+      }
+
+      await Linking.openURL(url);
+    } catch (error) {
+      console.log("CALL ERROR =", error);
+      Alert.alert("Error", "Unable to open phone dialer");
     }
-
-    await Linking.openURL(url);
   }
 
   function handleChat() {
-    if (!worker?.id) return;
+    if (!worker?.id) {
+      Alert.alert("Error", "Worker information not available");
+      return;
+    }
 
     router.push({
       pathname: "/shared/chat/room",
@@ -77,13 +118,90 @@ export default function WorkerProfile() {
   }
 
   function handleBook() {
-    if (!worker?.id) return;
+    if (!worker?.id) {
+      Alert.alert("Error", "Worker information not available");
+      return;
+    }
+
+    // 1) Route params থেকে serviceId
+    const fromParam = Array.isArray(paramServiceId)
+      ? paramServiceId[0]
+      : paramServiceId;
+
+    // 2) না থাকলে worker এর first active service
+    const fromList = services[0];
+
+    const finalServiceId =
+      fromParam && String(fromParam).trim()
+        ? String(fromParam)
+        : fromList?.id
+          ? String(fromList.id)
+          : "";
+
+    if (!finalServiceId) {
+      Alert.alert(
+        "No Service",
+        "This worker has not published any service yet. You can post a job instead.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Post Job",
+            onPress: () =>
+              router.push({
+                pathname: "/customer/post-job",
+                params: {
+                  workerId: String(worker.id),
+                  category: worker.category || "",
+                },
+              }),
+          },
+        ]
+      );
+      return;
+    }
+
+    const titleFromParam = Array.isArray(paramServiceTitle)
+      ? paramServiceTitle[0]
+      : paramServiceTitle;
+
+    const priceFromParam = Array.isArray(paramServicePrice)
+      ? paramServicePrice[0]
+      : paramServicePrice;
+
+    const categoryFromParam = Array.isArray(paramServiceCategory)
+      ? paramServiceCategory[0]
+      : paramServiceCategory;
+
+    const matchedService =
+      services.find((s) => String(s.id) === finalServiceId) ||
+      fromList;
 
     router.push({
-      pathname: "/customer/post-job",
+      pathname: "/customer/book-worker",
       params: {
+        serviceId: finalServiceId,
         workerId: String(worker.id),
-        category: worker.category || "",
+        workerName: String(worker.name || "Worker"),
+        category: String(
+          categoryFromParam ||
+            matchedService?.category ||
+            worker.category ||
+            ""
+        ),
+        serviceTitle: String(
+          titleFromParam ||
+            matchedService?.title ||
+            `${worker.name || "Worker"} Service`
+        ),
+        price: String(
+          priceFromParam ??
+            matchedService?.price ??
+            worker.price ??
+            0
+        ),
+        city: String(
+          matchedService?.city || worker.city || ""
+        ),
       },
     });
   }
@@ -100,7 +218,11 @@ export default function WorkerProfile() {
   if (!worker) {
     return (
       <View style={styles.loading}>
-        <Ionicons name="alert-circle-outline" size={42} color="#94A3B8" />
+        <Ionicons
+          name="alert-circle-outline"
+          size={42}
+          color="#94A3B8"
+        />
         <Text style={styles.loadingText}>Worker not found</Text>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.backLink}>Go Back</Text>
@@ -119,11 +241,33 @@ export default function WorkerProfile() {
   const rating = Number(worker.rating || 0).toFixed(1);
   const experience = worker.experience || "N/A";
   const completedJobs = worker.completedJobs ?? 0;
-  const price = worker.price ?? 0;
+
+  const fromParamPrice = Array.isArray(paramServicePrice)
+    ? paramServicePrice[0]
+    : paramServicePrice;
+
+  const price =
+    fromParamPrice ??
+    services[0]?.price ??
+    worker.price ??
+    0;
+
   const city = worker.city || "Not specified";
+
   const about =
     worker.about ||
     "Professional service provider with quality work and customer satisfaction.";
+
+  const selectedServiceTitle = Array.isArray(paramServiceTitle)
+    ? paramServiceTitle[0]
+    : paramServiceTitle || services[0]?.title || "";
+
+  const selectedCategory = Array.isArray(paramServiceCategory)
+    ? paramServiceCategory[0]
+    : paramServiceCategory ||
+      services[0]?.category ||
+      worker.category ||
+      "General";
 
   return (
     <View style={styles.container}>
@@ -132,11 +276,16 @@ export default function WorkerProfile() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingBottom: 120 + insets.bottom,
+          paddingBottom: 130 + insets.bottom,
         }}
       >
-        {/* ================= TOP HEADER ================= */}
-        <View style={[styles.hero, { paddingTop: insets.top + 10 }]}>
+        {/* HERO */}
+        <View
+          style={[
+            styles.hero,
+            { paddingTop: insets.top + 10 },
+          ]}
+        >
           <View style={styles.topBar}>
             <TouchableOpacity
               style={styles.iconBtn}
@@ -153,7 +302,10 @@ export default function WorkerProfile() {
           <View style={styles.profileBlock}>
             <View style={styles.avatarWrap}>
               {avatarUri ? (
-                <Image source={{ uri: avatarUri }} style={styles.avatar} />
+                <Image
+                  source={{ uri: avatarUri }}
+                  style={styles.avatar}
+                />
               ) : (
                 <View style={[styles.avatar, styles.avatarFallback]}>
                   <Text style={styles.avatarEmoji}>👨‍🔧</Text>
@@ -171,13 +323,47 @@ export default function WorkerProfile() {
             </View>
 
             <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={15} color="#DBEAFE" />
+              <Ionicons
+                name="location-outline"
+                size={15}
+                color="#DBEAFE"
+              />
               <Text style={styles.locationText}>{city}</Text>
             </View>
           </View>
         </View>
 
-        {/* ================= STATS ================= */}
+        {/* SELECTED SERVICE */}
+        {selectedServiceTitle ? (
+          <View style={styles.selectedServiceCard}>
+            <View style={styles.selectedServiceIcon}>
+              <Ionicons
+                name="construct-outline"
+                size={22}
+                color={COLORS.primary}
+              />
+            </View>
+
+            <View style={styles.selectedServiceInfo}>
+              <Text style={styles.selectedServiceLabel}>
+                Selected Service
+              </Text>
+              <Text
+                style={styles.selectedServiceTitle}
+                numberOfLines={2}
+              >
+                {selectedServiceTitle}
+              </Text>
+              <Text style={styles.selectedServiceCategory}>
+                {selectedCategory}
+              </Text>
+            </View>
+
+            <Text style={styles.selectedServicePrice}>৳{price}</Text>
+          </View>
+        ) : null}
+
+        {/* STATS */}
         <View style={styles.statsCard}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{experience}</Text>
@@ -199,7 +385,7 @@ export default function WorkerProfile() {
           </View>
         </View>
 
-        {/* ================= ABOUT ================= */}
+        {/* ABOUT */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
           <View style={styles.card}>
@@ -207,7 +393,7 @@ export default function WorkerProfile() {
           </View>
         </View>
 
-        {/* ================= DETAILS ================= */}
+        {/* DETAILS */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Details</Text>
           <View style={styles.card}>
@@ -222,7 +408,7 @@ export default function WorkerProfile() {
               <View style={styles.detailTextBox}>
                 <Text style={styles.detailLabel}>Category</Text>
                 <Text style={styles.detailValue}>
-                  {worker.category || "General"}
+                  {selectedCategory}
                 </Text>
               </View>
             </View>
@@ -261,17 +447,20 @@ export default function WorkerProfile() {
           </View>
         </View>
 
-        {/* ================= QUICK ACTIONS ================= */}
+        {/* CONTACT */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-
+          <Text style={styles.sectionTitle}>Contact Worker</Text>
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[styles.actionBtn, styles.chatBtn]}
               onPress={handleChat}
               activeOpacity={0.85}
             >
-              <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
+              <Ionicons
+                name="chatbubble-ellipses"
+                size={18}
+                color="#fff"
+              />
               <Text style={styles.actionText}>Chat</Text>
             </TouchableOpacity>
 
@@ -287,7 +476,7 @@ export default function WorkerProfile() {
         </View>
       </ScrollView>
 
-      {/* ================= BOTTOM BOOK ================= */}
+      {/* BOTTOM BOOK */}
       <View
         style={[
           styles.bottomBar,
@@ -295,7 +484,7 @@ export default function WorkerProfile() {
         ]}
       >
         <View style={styles.priceBox}>
-          <Text style={styles.priceLabel}>Starting from</Text>
+          <Text style={styles.priceLabel}>Service price</Text>
           <Text style={styles.priceValue}>৳{price}</Text>
         </View>
 
@@ -304,8 +493,8 @@ export default function WorkerProfile() {
           onPress={handleBook}
           activeOpacity={0.85}
         >
+          <Ionicons name="calendar-outline" size={19} color="#fff" />
           <Text style={styles.bookText}>Book Now</Text>
-          <Ionicons name="arrow-forward" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
@@ -451,8 +640,61 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
+  selectedServiceCard: {
+    marginTop: -10,
+    marginHorizontal: 20,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  selectedServiceIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  selectedServiceInfo: {
+    flex: 1,
+  },
+
+  selectedServiceLabel: {
+    fontSize: 11,
+    color: "#94A3B8",
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+
+  selectedServiceTitle: {
+    marginTop: 2,
+    fontSize: 15,
+    color: "#0F172A",
+    fontWeight: "800",
+  },
+
+  selectedServiceCategory: {
+    marginTop: 3,
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+
+  selectedServicePrice: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#16A34A",
+  },
+
   statsCard: {
-    marginTop: -18,
+    marginTop: 16,
     marginHorizontal: 20,
     backgroundColor: "#fff",
     borderRadius: 18,

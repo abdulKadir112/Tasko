@@ -6,8 +6,10 @@ import {
   Text,
   View,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 import HomeHeader from "@/components/home/HomeHeader";
 import HomeBanner from "@/components/home/HomeBanner";
@@ -20,33 +22,61 @@ import RecentJobCard from "@/components/home/RecentJobCard";
 import { COLORS } from "@/theme";
 
 import { getCategories } from "@/services/category.service";
-import { getServices } from "@/services/service.service";
+import {
+  getServices,
+  getEmergencyServices,
+} from "@/services/service.service";
 import { getWorkers } from "@/services/worker.service";
 import { getJobs } from "@/services/job.service";
+import {
+  getCurrentCoords,
+  getDistanceKm,
+  formatDistance,
+} from "@/services/location.service";
 
 export default function CustomerHome() {
   const [categories, setCategories] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [emergencyServices, setEmergencyServices] = useState<any[]>([]);
   const [workers, setWorkers] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  
+  const [myCoords, setMyCoords] = useState<{ lat: number; lng: number } | null>(
+    null
+  );
+
   useEffect(() => {
     loadHomeData();
+    loadMyLocation();
   }, []);
+
+  async function loadMyLocation() {
+    try {
+      const coords = await getCurrentCoords();
+      setMyCoords(coords);
+    } catch (e) {
+      // permission deny হলে distance না দেখালেও চলবে
+      console.log("Customer location:", e);
+    }
+  }
 
   async function loadHomeData() {
     try {
       setLoading(true);
 
-      const categoryRes = await getCategories();
-      const serviceRes = await getServices();
-      const workerRes = await getWorkers();
-      const jobRes = await getJobs();
+      const [categoryRes, serviceRes, emergencyRes, workerRes, jobRes] =
+        await Promise.all([
+          getCategories(),
+          getServices(),
+          getEmergencyServices(),
+          getWorkers(),
+          getJobs(),
+        ]);
 
       setCategories(categoryRes.data ?? []);
       setServices(serviceRes.data ?? []);
+      setEmergencyServices(emergencyRes.data ?? []);
       setWorkers(workerRes.data ?? []);
       setJobs(jobRes.data ?? []);
     } catch (error) {
@@ -56,6 +86,25 @@ export default function CustomerHome() {
     }
   }
 
+  function getDistanceText(item: any) {
+    if (
+      !myCoords ||
+      typeof item?.lat !== "number" ||
+      typeof item?.lng !== "number"
+    ) {
+      return item?.city || undefined;
+    }
+
+    const km = getDistanceKm(
+      myCoords.lat,
+      myCoords.lng,
+      item.lat,
+      item.lng
+    );
+
+    return formatDistance(km);
+  }
+
   function handleCategoryPress(categoryId: string) {
     router.push({
       pathname: "/customer/worker-list",
@@ -63,10 +112,6 @@ export default function CustomerHome() {
         category: categoryId,
       },
     });
-  }
-
-  function handlePostJob() {
-    router.push("/customer/post-job");
   }
 
   function handleWorkerPress(id: string) {
@@ -87,22 +132,63 @@ export default function CustomerHome() {
     });
   }
 
+  function handleServicePress(item: any) {
+    if (item?.workerId) {
+      router.push({
+        pathname: "/customer/worker-profile",
+        params: {
+          id: String(item.workerId),
+        },
+      });
+      return;
+    }
+  }
+
+  const filteredServices = search.trim()
+    ? services.filter((item) =>
+        String(item.title || "")
+          .toLowerCase()
+          .includes(search.trim().toLowerCase())
+      )
+    : services;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 30 }}
       >
         <HomeHeader />
+
         <SearchBar
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search jobs..."
-              onFilterPress={() => {
-                console.log("Filter");
-              }}
-            />
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search services, workers..."
+          onFilterPress={() => {
+            console.log("Filter");
+          }}
+        />
+
         <HomeBanner />
+
+        {/* ================= EMERGENCY ================= */}
+        <TouchableOpacity
+          style={styles.emergencyBanner}
+          activeOpacity={0.9}
+          onPress={() => router.push("/customer/emergency" as any)}
+        >
+          <View style={styles.emergencyIcon}>
+            <Ionicons name="flash" size={22} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.emergencyTitle}>Emergency Services</Text>
+            <Text style={styles.emergencySub}>
+              Roadside help, urgent repair — nearest workers
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#fff" />
+        </TouchableOpacity>
 
         {/* Categories */}
         <View style={styles.titleRow}>
@@ -125,6 +211,37 @@ export default function CustomerHome() {
           </View>
         )}
 
+        {/* Emergency list preview */}
+        {emergencyServices.length > 0 && (
+          <>
+            <View style={styles.titleRow}>
+              <Text style={styles.heading}>Nearby Emergency</Text>
+              <TouchableOpacity
+                onPress={() => router.push("/customer/emergency" as any)}
+              >
+                <Text style={styles.seeAll}>See all</Text>
+              </TouchableOpacity>
+            </View>
+
+            {emergencyServices.slice(0, 3).map((item) => (
+              <ServiceCard
+                key={item.id}
+                title={item.title}
+                category={item.category}
+                price={`From ৳${item.price}`}
+                rating={String(item.workerRating ?? item.rating ?? "5.0")}
+                city={item.city}
+                image={item.images?.[0] || item.image}
+                isEmergency
+                distanceText={getDistanceText(item)}
+                workerName={item.workerName}
+                onPress={() => handleServicePress(item)}
+                onBook={() => handleServicePress(item)}
+              />
+            ))}
+          </>
+        )}
+
         {/* Popular Workers */}
         <View style={styles.titleRow}>
           <Text style={styles.heading}>Popular Workers</Text>
@@ -139,7 +256,10 @@ export default function CustomerHome() {
               id={worker.id}
               name={worker.name}
               category={worker.category}
-              city={worker.city}
+              city={
+                getDistanceText(worker) ||
+                worker.city
+              }
               rating={worker.rating ?? 5}
               experience={worker.experience ?? "2 Years"}
               image={worker.photoURL}
@@ -155,14 +275,23 @@ export default function CustomerHome() {
 
         {loading ? (
           <ActivityIndicator size="large" color={COLORS.primary} />
+        ) : filteredServices.length === 0 ? (
+          <Text style={styles.emptyText}>No services found</Text>
         ) : (
-          services.map((item) => (
+          filteredServices.map((item) => (
             <ServiceCard
               key={item.id}
               title={item.title}
               category={item.category}
               price={`Starting ৳${item.price}`}
-              rating={String(item.rating)}
+              rating={String(item.workerRating ?? item.rating ?? "5.0")}
+              city={item.city}
+              image={item.images?.[0] || item.image}
+              isEmergency={Boolean(item.isEmergency)}
+              distanceText={getDistanceText(item)}
+              workerName={item.workerName}
+              onPress={() => handleServicePress(item)}
+              onBook={() => handleServicePress(item)}
             />
           ))
         )}
@@ -205,6 +334,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
+  emergencyBanner: {
+    marginTop: 18,
+    backgroundColor: "#EF4444",
+    borderRadius: 18,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  emergencyIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  emergencyTitle: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 16,
+  },
+
+  emergencySub: {
+    marginTop: 2,
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 12,
+  },
+
   titleRow: {
     marginTop: 28,
     marginBottom: 16,
@@ -219,9 +379,21 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
 
+  seeAll: {
+    color: COLORS.primary,
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
   categoryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+  },
+
+  emptyText: {
+    color: "#64748B",
+    fontWeight: "600",
+    marginBottom: 10,
   },
 });

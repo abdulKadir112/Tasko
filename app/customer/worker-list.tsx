@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -17,6 +17,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import WorkerCard from "@/components/worker/WorkerCard";
 import { getWorkersByCategory } from "@/services/worker.service";
+import {
+  getCurrentCoords,
+  getDistanceKm,
+  formatDistance,
+} from "@/services/location.service";
 import { COLORS } from "@/theme";
 
 function formatCategoryTitle(value?: string) {
@@ -36,12 +41,29 @@ export default function WorkerList() {
   const [workers, setWorkers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [myCoords, setMyCoords] = useState<{ lat: number; lng: number } | null>(
+    null
+  );
+  const [sortBy, setSortBy] = useState<"nearest" | "rating">("nearest");
+
+  useEffect(() => {
+    loadMyLocation();
+  }, []);
 
   useEffect(() => {
     if (categoryId) {
       loadWorkers();
     }
   }, [categoryId]);
+
+  async function loadMyLocation() {
+    try {
+      const coords = await getCurrentCoords();
+      setMyCoords(coords);
+    } catch (e) {
+      console.log("Location:", e);
+    }
+  }
 
   async function loadWorkers(isRefresh = false) {
     try {
@@ -61,13 +83,53 @@ export default function WorkerList() {
     }
   }
 
+  const sortedWorkers = useMemo(() => {
+    const list = [...workers];
+
+    if (sortBy === "rating") {
+      return list.sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+    }
+
+    // nearest
+    if (!myCoords) {
+      return list;
+    }
+
+    return list.sort((a, b) => {
+      const aOk = typeof a.lat === "number" && typeof a.lng === "number";
+      const bOk = typeof b.lat === "number" && typeof b.lng === "number";
+
+      if (!aOk && !bOk) return 0;
+      if (!aOk) return 1;
+      if (!bOk) return -1;
+
+      const da = getDistanceKm(myCoords.lat, myCoords.lng, a.lat, a.lng);
+      const db = getDistanceKm(myCoords.lat, myCoords.lng, b.lat, b.lng);
+
+      return da - db;
+    });
+  }, [workers, sortBy, myCoords]);
+
+  function distanceLabel(worker: any) {
+    if (
+      !myCoords ||
+      typeof worker.lat !== "number" ||
+      typeof worker.lng !== "number"
+    ) {
+      return worker.city || "Location N/A";
+    }
+
+    return formatDistance(
+      getDistanceKm(myCoords.lat, myCoords.lng, worker.lat, worker.lng)
+    );
+  }
+
   const title = formatCategoryTitle(categoryId);
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Header */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 8) }]}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -82,7 +144,9 @@ export default function WorkerList() {
             {title}
           </Text>
           <Text style={styles.subtitle}>
-            Available professionals near you
+            {myCoords
+              ? "Sorted by distance from you"
+              : "Available professionals near you"}
           </Text>
         </View>
 
@@ -116,7 +180,6 @@ export default function WorkerList() {
             />
           }
         >
-          {/* Summary card */}
           <View style={styles.summaryCard}>
             <View style={styles.summaryLeft}>
               <View style={styles.summaryIcon}>
@@ -124,7 +187,8 @@ export default function WorkerList() {
               </View>
               <View>
                 <Text style={styles.summaryTitle}>
-                  {workers.length} Worker{workers.length === 1 ? "" : "s"}
+                  {sortedWorkers.length} Worker
+                  {sortedWorkers.length === 1 ? "" : "s"}
                 </Text>
                 <Text style={styles.summarySub}>
                   Tap a worker to view full profile
@@ -139,14 +203,57 @@ export default function WorkerList() {
             </View>
           </View>
 
-          {workers.length === 0 ? (
+          {/* Sort chips */}
+          <View style={styles.sortRow}>
+            <TouchableOpacity
+              style={[
+                styles.sortChip,
+                sortBy === "nearest" && styles.sortChipActive,
+              ]}
+              onPress={() => setSortBy("nearest")}
+            >
+              <Ionicons
+                name="navigate-outline"
+                size={14}
+                color={sortBy === "nearest" ? "#fff" : "#475569"}
+              />
+              <Text
+                style={[
+                  styles.sortText,
+                  sortBy === "nearest" && styles.sortTextActive,
+                ]}
+              >
+                Nearest
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.sortChip,
+                sortBy === "rating" && styles.sortChipActive,
+              ]}
+              onPress={() => setSortBy("rating")}
+            >
+              <Ionicons
+                name="star-outline"
+                size={14}
+                color={sortBy === "rating" ? "#fff" : "#475569"}
+              />
+              <Text
+                style={[
+                  styles.sortText,
+                  sortBy === "rating" && styles.sortTextActive,
+                ]}
+              >
+                Top rated
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {sortedWorkers.length === 0 ? (
             <View style={styles.emptyBox}>
               <View style={styles.emptyIcon}>
-                <Ionicons
-                  name="search-outline"
-                  size={32}
-                  color="#94A3B8"
-                />
+                <Ionicons name="search-outline" size={32} color="#94A3B8" />
               </View>
               <Text style={styles.emptyTitle}>No workers found</Text>
               <Text style={styles.emptySub}>
@@ -161,11 +268,11 @@ export default function WorkerList() {
               </TouchableOpacity>
             </View>
           ) : (
-            workers.map((worker) => (
+            sortedWorkers.map((worker) => (
               <WorkerCard
                 key={worker.id}
                 name={worker.name}
-                city={worker.city}
+                city={distanceLabel(worker)}
                 rating={worker.rating}
                 experience={worker.experience}
                 price={worker.price}
@@ -260,7 +367,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 18,
     padding: 14,
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: "#E2E8F0",
     flexDirection: "row",
@@ -310,6 +417,39 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: "#475569",
+  },
+
+  sortRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 14,
+  },
+
+  sortChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+
+  sortChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+
+  sortText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#475569",
+  },
+
+  sortTextActive: {
+    color: "#fff",
   },
 
   emptyBox: {

@@ -20,12 +20,12 @@ type Props = {
  * ভুলবশত gesture activate না করে দেয়, তার জন্য একটা
  * ন্যূনতম movement threshold (pixel)।
  */
-const ACTIVATION_THRESHOLD = 8;
+const ACTIVATION_THRESHOLD = 6;
 
 /*
  * ⭐ কতদূর ডানে সরালে reply trigger হবে
  */
-const REPLY_TRIGGER_DISTANCE = 90;
+const REPLY_TRIGGER_DISTANCE = 20;
 
 export default function SwipeableMessage({
   children,

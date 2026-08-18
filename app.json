@@ -6,24 +6,20 @@
     "orientation": "portrait",
     "scheme": "servicemarketplace",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.abdulkadir.servicemarketplace"
     },
-
     "android": {
       "package": "com.abdulkadir.servicemarketplace",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "resize"
     },
-
     "web": {
       "output": "static"
     },
-
     "plugins": [
       "expo-router",
       [
@@ -34,9 +30,9 @@
         }
       ],
       "expo-speech-recognition",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-secure-store"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

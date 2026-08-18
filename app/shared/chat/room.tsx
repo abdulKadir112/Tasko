@@ -153,16 +153,15 @@ function normalizeBoolean(
 
 /* =========================================================
    CLIENT MESSAGE ID NORMALIZER
-   ⭐ NEW: ChatRoomScreen-এও একই normalize logic ব্যবহার
-   করা হচ্ছে, যাতে useChatMessages hook-এর সাথে সামঞ্জস্য
-   থাকে এবং clientMessageId ধরে সঠিকভাবে duplicate বের
-   করা যায়।
 ========================================================= */
 
 function normalizeClientMessageId(
   value: any
 ): string {
-  if (value === undefined || value === null) {
+  if (
+    value === undefined ||
+    value === null
+  ) {
     return "";
   }
 
@@ -187,29 +186,11 @@ function responseToLocalMessage(
     createdAt
   );
 
-  /*
-   * IMPORTANT:
-   *
-   * Backend যদি replyTo পাঠায় সেটা নেব।
-   * না পাঠালে optimistic message-এর
-   * replyTo preserve করব।
-   */
-
   const replyTo =
     response?.replyTo ??
     response?.reply_to ??
     fallback.replyTo ??
     null;
-
-  /*
-   * ⭐ IMPORTANT FIX
-   *
-   * Server response-এ clientMessageId না থাকলেও
-   * fallback (optimistic message)-এর clientMessageId
-   * অবশ্যই preserve করতে হবে। এটা না করলে
-   * dedup logic কাজ করবে না এবং duplicate
-   * message দেখা যাবে।
-   */
 
   const clientMessageId =
     normalizeClientMessageId(
@@ -228,9 +209,6 @@ function responseToLocalMessage(
         fallback.id
     ),
 
-    /*
-     * ⭐ REAL MESSAGE-এও clientMessageId রাখা হচ্ছে
-     */
     clientMessageId,
 
     chatId: String(
@@ -272,27 +250,8 @@ function responseToLocalMessage(
       fallback.fileUrl ??
       null,
 
-    /*
-     * ⭐ REPLY
-     */
     replyTo,
 
-    /*
-     * ⭐⭐⭐ CRITICAL FIX ⭐⭐⭐
-     *
-     * আগে এখানে ছিল:
-     *   response?.status ?? (response?.isSeen ? "seen" : fallback.status ?? "sent")
-     *
-     * সমস্যা: fallback.status সবসময় "sending" (একটা truthy
-     * string, null/undefined না)। তাই `fallback.status ?? "sent"`
-     * কখনো "sent"-এ পড়েই না — ?? অপারেটর শুধু null/undefined
-     * হলে ডানপাশেরটা ব্যবহার করে।
-     *
-     * ফলে সার্ভারে মেসেজ সফলভাবে পাঠানো হয়ে গেলেও local
-     * status "sending"-ই থেকে যেত। এতে queue worker মেসেজটাকে
-     * এখনো "pending" ভেবে ৮ সেকেন্ড পর আবার পাঠিয়ে দিত —
-     * এটাই "মেসেজ sent হতে দেরি হচ্ছে" সমস্যার আসল কারণ।
-     */
     status:
       response?.status ??
       (response?.isSeen
@@ -311,27 +270,23 @@ function responseToLocalMessage(
 
 /* =========================================================
    REMOVE DUPLICATE
-   ⭐ FIXED: আগে শুধু item.id ধরে duplicate বের করা হতো।
-   কিন্তু optimistic message-এর id (temp_xxx) আর server/
-   Firebase থেকে আসা real message-এর id (server id বা
-   Firestore doc id) আলাদা হওয়ার কারণে duplicate ধরা
-   পড়ত না — ফলে message/voice দুইবার দেখাত।
-
-   এখন clientMessageId কে প্রথম priority হিসেবে ব্যবহার
-   করা হচ্ছে (useChatMessages hook-এর dedup logic-এর
-   সাথে সামঞ্জস্যপূর্ণ)। clientMessageId না থাকলে
-   fallback হিসেবে id ব্যবহার হবে।
 ========================================================= */
 
 function removeDuplicateMessages(
   list: LocalMessage[]
 ): LocalMessage[] {
-  if (!Array.isArray(list) || list.length === 0) {
+  if (
+    !Array.isArray(list) ||
+    list.length === 0
+  ) {
     return [];
   }
 
-  const seenClientIds = new Set<string>();
-  const seenIds = new Set<string>();
+  const seenClientIds =
+    new Set<string>();
+
+  const seenIds =
+    new Set<string>();
 
   const result: LocalMessage[] = [];
 
@@ -340,18 +295,23 @@ function removeDuplicateMessages(
       continue;
     }
 
-    const id = String(item.id ?? "").trim();
+    const id = String(
+      item.id ?? ""
+    ).trim();
 
-    const clientId = normalizeClientMessageId(
-      (item as any).clientMessageId
-    );
+    const clientId =
+      normalizeClientMessageId(
+        (item as any).clientMessageId
+      );
 
     /* =====================================================
-       1. CLIENT MESSAGE ID দিয়ে duplicate চেক
-       ===================================================== */
+       1. CLIENT MESSAGE ID
+    ===================================================== */
 
     if (clientId) {
-      if (seenClientIds.has(clientId)) {
+      if (
+        seenClientIds.has(clientId)
+      ) {
         console.log(
           "⚠️ Duplicate message removed (clientMessageId):",
           clientId
@@ -362,7 +322,6 @@ function removeDuplicateMessages(
 
       seenClientIds.add(clientId);
 
-      // একই message এর id ও future compare-এর জন্য track করি
       if (id) {
         seenIds.add(id);
       }
@@ -373,8 +332,8 @@ function removeDuplicateMessages(
     }
 
     /* =====================================================
-       2. FALLBACK — শুধু id দিয়ে চেক
-       ===================================================== */
+       2. FALLBACK ID
+    ===================================================== */
 
     if (id) {
       if (seenIds.has(id)) {
@@ -444,20 +403,27 @@ export default function ChatRoomScreen() {
 
   const safeSetMessages: Dispatch<
     SetStateAction<LocalMessage[]>
-  > = useCallback((action) => {
-    setMessages((previous) => {
-      const next =
-        typeof action === "function"
-          ? (action as (p: LocalMessage[]) => LocalMessage[])(
-              previous as LocalMessage[]
-            )
-          : action;
+  > = useCallback(
+    (action) => {
+      setMessages((previous) => {
+        const next =
+          typeof action === "function"
+            ? (
+                action as (
+                  p: LocalMessage[]
+                ) => LocalMessage[]
+              )(
+                previous as LocalMessage[]
+              )
+            : action;
 
-      return removeDuplicateMessages(
-        next as LocalMessage[]
-      );
-    });
-  }, [setMessages]);
+        return removeDuplicateMessages(
+          next as LocalMessage[]
+        );
+      });
+    },
+    [setMessages]
+  );
 
   /* =======================================================
      DISPLAY MESSAGES
@@ -804,20 +770,11 @@ export default function ChatRoomScreen() {
       userId:
         user?.uid,
 
-      /*
-       * ⭐ REPLY SUPPORT
-       */
       getReplyTo,
 
-      /*
-       * ⭐ SAFE MESSAGE UPDATE
-       */
       setMessages:
         safeSetMessages,
 
-      /*
-       * ⭐ CLEAR REPLY AFTER VOICE
-       */
       setReplyMessage,
     });
 
@@ -844,10 +801,6 @@ export default function ChatRoomScreen() {
     const createdAt =
       Date.now();
 
-    /*
-     * ⭐ SAVE REPLY BEFORE CLEARING
-     */
-
     const replyTo =
       getReplyTo();
 
@@ -856,15 +809,6 @@ export default function ChatRoomScreen() {
       id:
         clientMessageId,
 
-      /*
-       * ⭐⭐⭐ CRITICAL FIX ⭐⭐⭐
-       *
-       * আগে এই ফিল্ডটা মিসিং ছিল, যার কারণে
-       * dedup logic optimistic message আর
-       * server/Firebase থেকে আসা real message
-       * একই message হিসেবে চিনতে পারত না —
-       * ফলে টেক্সট মেসেজ দুইবার দেখাত।
-       */
       clientMessageId,
 
       chatId:
@@ -930,9 +874,6 @@ export default function ChatRoomScreen() {
 
     setText("");
 
-    /*
-     * ⭐ CLEAR REPLY
-     */
     setReplyMessage(
       null
     );
@@ -962,9 +903,6 @@ export default function ChatRoomScreen() {
 
           clientMessageId,
 
-          /*
-           * ⭐ REPLY
-           */
           replyTo:
             tempMessage.replyTo,
         });
@@ -1061,14 +999,13 @@ export default function ChatRoomScreen() {
           }
         );
 
-      /*
-       * ⭐ DEBUG — ঠিক কী পাওয়া যাচ্ছে সেটা দেখার জন্য।
-       * সমস্যা ধরা পড়লে এই লগগুলো সরিয়ে দেওয়া যাবে।
-       */
-
       console.log(
         "🖼️ ImagePicker result:",
-        JSON.stringify(result, null, 2)
+        JSON.stringify(
+          result,
+          null,
+          2
+        )
       );
 
       if (
@@ -1112,13 +1049,13 @@ export default function ChatRoomScreen() {
           }
         );
 
-      /*
-       * ⭐ DEBUG
-       */
-
       console.log(
         "📷 Camera result:",
-        JSON.stringify(result, null, 2)
+        JSON.stringify(
+          result,
+          null,
+          2
+        )
       );
 
       if (
@@ -1171,11 +1108,6 @@ export default function ChatRoomScreen() {
     const createdAt =
       Date.now();
 
-    /*
-     * ⭐ IMPORTANT
-     * Reply object আগে save করতে হবে
-     */
-
     const replyTo =
       getReplyTo();
 
@@ -1184,13 +1116,6 @@ export default function ChatRoomScreen() {
       id:
         clientMessageId,
 
-      /*
-       * ⭐⭐⭐ CRITICAL FIX ⭐⭐⭐
-       *
-       * টেক্সট মেসেজের মতো এখানেও
-       * clientMessageId মিসিং ছিল, যার কারণে
-       * ইমেজ মেসেজও duplicate দেখাত।
-       */
       clientMessageId,
 
       chatId:
@@ -1217,9 +1142,6 @@ export default function ChatRoomScreen() {
       fileUrl:
         null,
 
-      /*
-       * ⭐ IMAGE REPLY
-       */
       replyTo,
 
       status:
@@ -1309,9 +1231,6 @@ export default function ChatRoomScreen() {
 
           clientMessageId,
 
-          /*
-           * ⭐ IMAGE REPLY
-           */
           replyTo:
             optimisticMessage.replyTo,
         });
@@ -1324,13 +1243,11 @@ export default function ChatRoomScreen() {
         responseToLocalMessage(
           {
             ...response,
-
             imageUrl,
           },
 
           {
             ...optimisticMessage,
-
             imageUrl,
           }
         );
@@ -1406,34 +1323,35 @@ export default function ChatRoomScreen() {
   }
 
   /* =======================================================
-     RETRY FAILED MESSAGE  (⭐ NEW)
-     -------------------------------------------------------
-     Queue worker শুধু status = 'sending' মেসেজ retry করে,
-     'failed' মেসেজ কখনো ছোঁয় না — তাই একবার fail হলে সেই
-     মেসেজ চিরকাল আটকে থাকত, ম্যানুয়ালি আবার পাঠানোর কোনো
-     উপায় ছিল না। এখন failed মেসেজে tap করলে এই ফাংশনটা
-     পুরনো clientMessageId ব্যবহার করেই আবার পাঠানোর চেষ্টা
-     করবে (নতুন clientMessageId বানাবে না, তাই duplicate
-     হবে না)।
+     RETRY FAILED MESSAGE
   ======================================================= */
 
   async function retryMessage(
     message: LocalMessage
   ) {
     if (
-      message.status !== "failed"
+      message.status !==
+      "failed"
     ) {
       return;
     }
 
-    if (!user?.uid || !chatId || !receiverId) {
+    if (
+      !user?.uid ||
+      !chatId ||
+      !receiverId
+    ) {
       return;
     }
 
     const clientMessageId =
       message.clientMessageId &&
-      String(message.clientMessageId).trim()
-        ? String(message.clientMessageId).trim()
+      String(
+        message.clientMessageId
+      ).trim()
+        ? String(
+            message.clientMessageId
+          ).trim()
         : null;
 
     if (!clientMessageId) {
@@ -1441,6 +1359,7 @@ export default function ChatRoomScreen() {
         "⚠️ Retry skipped, no clientMessageId:",
         message.id
       );
+
       return;
     }
 
@@ -1449,78 +1368,106 @@ export default function ChatRoomScreen() {
       message.id
     );
 
-    /*
-     * UI-তে সাথে সাথে "sending" দেখাও
-     */
+    /* UI */
 
     updateMessageStatus(
       message.id,
       "sending"
     );
 
-    safeSetMessages((prev) =>
-      prev.map((item) =>
-        item.id === message.id
-          ? { ...item, status: "sending" as const }
-          : item
-      )
+    safeSetMessages(
+      (prev) =>
+        prev.map(
+          (item) =>
+            item.id ===
+            message.id
+              ? {
+                  ...item,
+                  status:
+                    "sending" as const,
+                }
+              : item
+        )
     );
 
     try {
       let imageUrl =
-        message.imageUrl ?? undefined;
+        message.imageUrl ??
+        undefined;
 
-      /*
-       * ছবি এখনো লোকাল file uri হলে (আগে upload-ই
-       * হয়নি) আবার upload করতে হবে। ইতিমধ্যে http
-       * URL হলে re-upload দরকার নেই।
-       */
+      /* IMAGE UPLOAD */
 
       if (
-        message.type === "image" &&
+        message.type ===
+          "image" &&
         imageUrl &&
-        !imageUrl.startsWith("http")
+        !imageUrl.startsWith(
+          "http"
+        )
       ) {
-        setUploading(true);
+        setUploading(
+          true
+        );
 
-        imageUrl = await uploadImage(imageUrl);
+        imageUrl =
+          await uploadImage(
+            imageUrl
+          );
       }
+
+      /* SEND */
 
       const response =
         await sendMessage({
-          chatId: message.chatId,
-          receiverId: message.receiverId,
-          message: message.message,
+          chatId:
+            message.chatId,
 
-          type: message.type,
+          receiverId:
+            message.receiverId,
+
+          message:
+            message.message,
+
+          type:
+            message.type,
 
           imageUrl:
-            message.type === "image"
+            message.type ===
+            "image"
               ? imageUrl
               : undefined,
 
           voiceUrl:
-            message.voiceUrl ?? undefined,
+            message.voiceUrl ??
+            undefined,
 
           clientMessageId,
 
-          replyTo: message.replyTo ?? undefined,
+          replyTo:
+            message.replyTo ??
+            undefined,
         });
 
       const realMessage =
         responseToLocalMessage(
           {
             ...response,
+
             imageUrl:
-              message.type === "image"
+              message.type ===
+              "image"
                 ? imageUrl
                 : response?.imageUrl,
           },
+
           {
             ...message,
+
             imageUrl:
-              message.type === "image"
-                ? imageUrl ?? message.imageUrl
+              message.type ===
+              "image"
+                ? imageUrl ??
+                  message.imageUrl
                 : message.imageUrl,
           }
         );
@@ -1530,15 +1477,22 @@ export default function ChatRoomScreen() {
         realMessage
       );
 
-      safeSetMessages((prev) => {
-        const updated = prev.map((item) =>
-          item.id === message.id
-            ? realMessage
-            : item
-        );
+      safeSetMessages(
+        (prev) => {
+          const updated =
+            prev.map(
+              (item) =>
+                item.id ===
+                message.id
+                  ? realMessage
+                  : item
+            );
 
-        return removeDuplicateMessages(updated);
-      });
+          return removeDuplicateMessages(
+            updated
+          );
+        }
+      );
 
       console.log(
         "✅ Retry success:",
@@ -1555,16 +1509,28 @@ export default function ChatRoomScreen() {
         "failed"
       );
 
-      safeSetMessages((prev) =>
-        prev.map((item) =>
-          item.id === message.id
-            ? { ...item, status: "failed" as const }
-            : item
-        )
+      safeSetMessages(
+        (prev) =>
+          prev.map(
+            (item) =>
+              item.id ===
+              message.id
+                ? {
+                    ...item,
+                    status:
+                      "failed" as const,
+                  }
+                : item
+          )
       );
     } finally {
-      if (message.type === "image") {
-        setUploading(false);
+      if (
+        message.type ===
+        "image"
+      ) {
+        setUploading(
+          false
+        );
       }
     }
   }
@@ -1605,11 +1571,6 @@ export default function ChatRoomScreen() {
       "📞 Audio call:",
       receiverId
     );
-
-    /*
-     * এখানে পরে Zego / calling service
-     * connect করা হবে।
-     */
   }
 
   /* =======================================================
@@ -1621,11 +1582,6 @@ export default function ChatRoomScreen() {
       "🎥 Video call:",
       receiverId
     );
-
-    /*
-     * এখানে পরে Zego / calling service
-     * connect করা হবে।
-     */
   }
 
   /* =======================================================
@@ -1768,9 +1724,6 @@ export default function ChatRoomScreen() {
                   : ""
               }
 
-              /*
-               * ⭐ REPLY DATA
-               */
               replyTo={
                 item.replyTo
               }
@@ -1783,20 +1736,16 @@ export default function ChatRoomScreen() {
                 item.isSeen
               )}
 
-              /*
-               * ⭐ REPLY BUTTON
-               */
               onReply={() =>
                 handleReply(
                   item
                 )
               }
 
-              /*
-               * ⭐ NEW — failed মেসেজে tap করলে retry
-               */
               onRetry={() =>
-                retryMessage(item)
+                retryMessage(
+                  item
+                )
               }
             />
           );

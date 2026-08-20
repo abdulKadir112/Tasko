@@ -97,6 +97,41 @@ export type NotificationActionResponse = {
 };
 
 /* =========================================================
+   SAVE / UPDATE FCM TOKEN
+   ---------------------------------------------------------
+   POST /api/users/fcm-token
+========================================================= */
+
+export async function saveFcmToken(
+  fcmToken: string
+): Promise<NotificationActionResponse> {
+  const token = String(fcmToken || "").trim();
+
+  if (!token) {
+    throw new Error("FCM Token is required");
+  }
+
+  try {
+    const response =
+      await api.post<NotificationActionResponse>(
+        "/users/fcm-token",
+        { fcmToken: token }
+      );
+
+    return response.data;
+  } catch (error: any) {
+    console.error(
+      "❌ SAVE FCM TOKEN ERROR =",
+      error?.response?.data ||
+        error?.message ||
+        error
+    );
+
+    throw error;
+  }
+}
+
+/* =========================================================
    GET MY NOTIFICATIONS
    ---------------------------------------------------------
    GET /api/notifications
@@ -173,7 +208,7 @@ export async function getUnreadNotificationCount(): Promise<number> {
 
     /**
      * Fallback:
-     * যদি backend unreadCount না পাঠায়,
+     * যদি backend unreadCount না পাঠায়,
      * তাহলে frontend নিজে count করবে।
      */
     if (Array.isArray(data?.data)) {
@@ -511,9 +546,9 @@ export function formatNotificationTime(
 }
 
 /* =========================================================
-   GET NOTIFICATION ICON
+   HELPER — GET NOTIFICATION ICON
    ---------------------------------------------------------
-   Notification type অনুযায়ী icon name।
+   Notification type অনুযায়ী icon name।
 ========================================================= */
 
 export function getNotificationIcon(
@@ -562,4 +597,4 @@ export function getNotificationIconColor(
     default:
       return "#64748B";
   }
-}
+};

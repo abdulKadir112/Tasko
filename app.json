@@ -1,18 +1,28 @@
 {
   "expo": {
-    "name": "service-marketplace",
-    "slug": "service-marketplace",
+    "name": "Tasko",
+    "slug": "tasko",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "servicemarketplace",
+    "icon": "./assets/images/icon.png",
+    "scheme": "tasko",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.abdulkadir.servicemarketplace"
     },
     "android": {
       "package": "com.abdulkadir.servicemarketplace",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "resize"
@@ -25,8 +35,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Service Marketplace to access your photos.",
-          "cameraPermission": "Allow Service Marketplace to access your camera."
+          "photosPermission": "Allow Tasko to access your photos.",
+          "cameraPermission": "Allow Tasko to access your camera."
         }
       ],
       "expo-speech-recognition",

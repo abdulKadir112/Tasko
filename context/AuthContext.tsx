@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 
 import { auth, db } from "@/config/firebase";
+import { registerForPushNotifications } from "@/services/push-notification.service";
 
 export type AppUser = {
   uid: string;
@@ -90,6 +91,8 @@ export function AuthProvider({
 
           if (currentUser) {
             await loadUser(currentUser.uid);
+            // ইউজার সফলভাবে লগইন হলে FCM টোকেন সেভ হবে
+            registerForPushNotifications();
           } else {
             setUser(null);
           }

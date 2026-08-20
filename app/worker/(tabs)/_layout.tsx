@@ -1,8 +1,37 @@
-import { Tabs } from "expo-router";
+import { useEffect } from "react";
+import { Tabs, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { COLORS } from "@/theme";
 
+// চেক: অ্যাপটি Expo Go-তে চলছে কিনা
+const isExpoGo =
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
 export default function WorkerTabs() {
+  useEffect(() => {
+    // Expo Go-তে থাকলে পুশ নোটিফিকেশন লিসেনার স্কিপ করবে
+    if (isExpoGo) return;
+
+    // ডায়নামিকালি ইমপোর্ট
+    const Notifications = require("expo-notifications");
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response: any) => {
+        const data = response.notification.request.content.data;
+
+        if (data?.screen) {
+          router.push({
+            pathname: data.screen as any,
+            params: (data.params as Record<string, any>) || {},
+          });
+        }
+      }
+    );
+
+    return () => subscription.remove();
+  }, []);
+
   return (
     <Tabs
       screenOptions={{
@@ -15,6 +44,10 @@ export default function WorkerTabs() {
           paddingTop: 8,
           borderTopWidth: 0,
           elevation: 10,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
           backgroundColor: "#fff",
         },
         tabBarLabelStyle: {

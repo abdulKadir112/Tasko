@@ -6,6 +6,9 @@ export default function CustomerLayout() {
       screenOptions={{
         headerShown: false,
         animation: "slide_from_right",
+        contentStyle: {
+          backgroundColor: "#ffffff",
+        },
       }}
     >
       <Stack.Screen name="(tabs)" />
@@ -16,7 +19,7 @@ export default function CustomerLayout() {
       <Stack.Screen name="edit-job" />
       <Stack.Screen name="bids" />
 
-      {/* Workers & services */}
+      {/* Workers & Services */}
       <Stack.Screen name="worker-list" />
       <Stack.Screen name="worker-profile" />
       <Stack.Screen name="category-services" />

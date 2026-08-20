@@ -23,10 +23,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <KeyboardProvider
-        statusBarTranslucent={false}
-        navigationBarTranslucent={false}
-      >
+      <KeyboardProvider>
         <SafeAreaProvider>
           <AuthProvider>
             <StatusBar
@@ -45,10 +42,14 @@ export default function RootLayout() {
               }}
             >
               <Stack.Screen name="index" />
+              <Stack.Screen name="splash" />
               <Stack.Screen name="auth" />
               <Stack.Screen name="customer" />
               <Stack.Screen name="worker" />
-              <Stack.Screen name="shared" />
+              <Stack.Screen name="shared/notifications" />
+              <Stack.Screen name="shared/chat/index" />
+              <Stack.Screen name="shared/chat/room" />
+              <Stack.Screen name="shared/chat/image-viewer" />
             </Stack>
           </AuthProvider>
         </SafeAreaProvider>

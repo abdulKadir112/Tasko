@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  RefreshControl,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -37,7 +38,6 @@ import {
 } from "@/services/location.service";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
 const JOB_CARD_WIDTH = SCREEN_WIDTH - 60;
 
 export default function CustomerHome() {
@@ -48,6 +48,7 @@ export default function CustomerHome() {
   const [jobs, setJobs] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
 
   const [myCoords, setMyCoords] = useState<{
@@ -97,6 +98,12 @@ export default function CustomerHome() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function onRefresh() {
+    setRefreshing(true);
+    await Promise.all([loadHomeData(), loadMyLocation()]);
+    setRefreshing(false);
   }
 
   function getDistanceText(item: any) {
@@ -176,18 +183,6 @@ export default function CustomerHome() {
       )
     : services;
 
-  /**
-   * ============================================
-   * MOST BIDDED JOBS
-   * ============================================
-   *
-   * এখানে customer-এর নিজের job আলাদা করে দেখানো হচ্ছে না।
-   *
-   * শুধু open/public job নেওয়া হচ্ছে এবং
-   * সবচেয়ে বেশি bid পাওয়া job আগে দেখানো হচ্ছে।
-   *
-   * bidCount না থাকলে bids array-এর length ব্যবহার করবে।
-   */
   const mostBiddedJobs = useMemo(() => {
     const openJobs = jobs.filter((job) => {
       const status = String(job?.status || "open").toLowerCase();
@@ -225,15 +220,19 @@ export default function CustomerHome() {
         style={styles.container}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 30 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
       >
-        {/* ============================================
-            HEADER
-        ============================================ */}
+        {/* HEADER */}
         <HomeHeader />
 
-        {/* ============================================
-            SEARCH
-        ============================================ */}
+        {/* SEARCH */}
         <SearchBar
           value={search}
           onChangeText={setSearch}
@@ -243,9 +242,7 @@ export default function CustomerHome() {
           }}
         />
 
-        {/* ============================================
-            CATEGORIES
-        ============================================ */}
+        {/* CATEGORIES */}
         <View style={styles.categorySection}>
           <ScrollView
             horizontal
@@ -271,14 +268,10 @@ export default function CustomerHome() {
           </ScrollView>
         </View>
 
-        {/* ============================================
-            HOME BANNER
-        ============================================ */}
+        {/* HOME BANNER */}
         <HomeBanner />
 
-        {/* ============================================
-            EMERGENCY
-        ============================================ */}
+        {/* EMERGENCY */}
         <TouchableOpacity
           style={styles.emergencyBanner}
           activeOpacity={0.9}
@@ -311,9 +304,7 @@ export default function CustomerHome() {
           />
         </TouchableOpacity>
 
-        {/* ============================================
-            NEARBY EMERGENCY
-        ============================================ */}
+        {/* NEARBY EMERGENCY */}
         {emergencyServices.length > 0 && (
           <>
             <View style={styles.titleRow}>
@@ -359,9 +350,7 @@ export default function CustomerHome() {
           </>
         )}
 
-        {/* ============================================
-            POPULAR WORKERS
-        ============================================ */}
+        {/* POPULAR WORKERS */}
         <View style={styles.titleRow}>
           <Text style={styles.heading}>
             Popular Workers
@@ -398,9 +387,7 @@ export default function CustomerHome() {
           ))
         )}
 
-        {/* ============================================
-            POPULAR SERVICES
-        ============================================ */}
+        {/* POPULAR SERVICES */}
         <View style={styles.titleRow}>
           <Text style={styles.heading}>
             Popular Services
@@ -445,10 +432,7 @@ export default function CustomerHome() {
           ))
         )}
 
-        {/* ============================================
-            🔥 MOST BIDDED JOBS
-            Horizontal Slider
-        ============================================ */}
+        {/* MOST BIDDED JOBS */}
         {mostBiddedJobs.length > 0 && (
           <>
             <View style={styles.titleRow}>
@@ -503,7 +487,6 @@ export default function CustomerHome() {
                       handleJobPress(job.id)
                     }
                   >
-                    {/* JOB IMAGE */}
                     <View
                       style={styles.jobImageContainer}
                     >
@@ -528,7 +511,6 @@ export default function CustomerHome() {
                         </View>
                       )}
 
-                      {/* BID BADGE */}
                       <View
                         style={styles.bidBadge}
                       >
@@ -545,7 +527,6 @@ export default function CustomerHome() {
                         </Text>
                       </View>
 
-                      {/* OPEN BADGE */}
                       <View
                         style={styles.openBadge}
                       >
@@ -563,7 +544,6 @@ export default function CustomerHome() {
                       </View>
                     </View>
 
-                    {/* JOB CONTENT */}
                     <View
                       style={styles.jobContent}
                     >
@@ -653,7 +633,6 @@ export default function CustomerHome() {
                         </View>
                       </View>
 
-                      {/* VIEW JOB */}
                       <View
                         style={
                           styles.viewJobRow
@@ -699,10 +678,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-  /* =========================
-     CATEGORIES
-  ========================= */
-
   categorySection: {
     marginTop: 16,
     marginBottom: 8,
@@ -711,10 +686,6 @@ const styles = StyleSheet.create({
   categoryScroll: {
     paddingRight: 10,
   },
-
-  /* =========================
-     EMERGENCY
-  ========================= */
 
   emergencyBanner: {
     marginTop: 18,
@@ -730,8 +701,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 14,
-    backgroundColor:
-      "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -747,10 +717,6 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.9)",
     fontSize: 12,
   },
-
-  /* =========================
-     SECTION TITLE
-  ========================= */
 
   titleRow: {
     marginTop: 28,
@@ -787,10 +753,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 10,
   },
-
-  /* =========================
-     MOST BIDDED JOB SLIDER
-  ========================= */
 
   jobsSliderContent: {
     paddingRight: 8,
@@ -833,10 +795,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#E2E8F0",
   },
 
-  /* =========================
-     BID BADGE
-  ========================= */
-
   bidBadge: {
     position: "absolute",
     top: 12,
@@ -855,10 +813,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
   },
-
-  /* =========================
-     OPEN BADGE
-  ========================= */
 
   openBadge: {
     position: "absolute",
@@ -885,10 +839,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
   },
-
-  /* =========================
-     JOB CONTENT
-  ========================= */
 
   jobContent: {
     padding: 16,
@@ -940,10 +890,6 @@ const styles = StyleSheet.create({
     color: "#15803D",
     fontWeight: "800",
   },
-
-  /* =========================
-     VIEW JOB
-  ========================= */
 
   viewJobRow: {
     marginTop: 16,

@@ -3,7 +3,6 @@ import api from "@/config/api";
 /* =========================================================
    BOOKING STATUS
 ========================================================= */
-
 export type BookingStatus =
   | "pending"
   | "accepted"
@@ -17,19 +16,27 @@ export type BookingStatus =
 /* =========================================================
    FIREBASE TIMESTAMP
 ========================================================= */
-
 export type FirebaseTimestampLike = {
   seconds?: number;
   nanoseconds?: number;
-
   _seconds?: number;
   _nanoseconds?: number;
 };
 
 /* =========================================================
+   BOOKING PACKAGE
+========================================================= */
+export type BookingPackage = {
+  id: "basic" | "standard" | "premium";
+  title: string;
+  price: number;
+  description?: string;
+  deliveryHours?: number;
+};
+
+/* =========================================================
    BOOKING
 ========================================================= */
-
 export type Booking = {
   id: string;
 
@@ -44,25 +51,61 @@ export type Booking = {
   serviceId?: string | null;
 
   workerId: string;
-
   customerId: string;
 
   serviceTitle?: string;
-
   category?: string;
-
   price?: number;
 
   requestedDate?: string | null;
 
   customerMessage?: string;
 
-  /*
-   * ⭐ NEW — BookWorkerScreen থেকে আসা তথ্য
+  /* =====================================================
+     CONTACT / LOCATION INFORMATION
+  ===================================================== */
+
+  /**
+   * Service address
    */
   address?: string | null;
 
+  /**
+   * Customer city
+   */
+  city?: string | null;
+
+  /**
+   * Customer contact phone
+   */
+  phone?: string | null;
+
+  /**
+   * Booking urgency
+   */
   urgency?: "normal" | "urgent";
+
+  /* =====================================================
+     SELECTED PACKAGE
+  ===================================================== */
+
+  packageId?:
+    | "basic"
+    | "standard"
+    | "premium"
+    | null;
+
+  packageTitle?: string | null;
+
+  packagePrice?: number | null;
+
+  packageDeliveryHours?: number | null;
+
+  selectedPackage?: BookingPackage | null;
+
+  /* =====================================================
+     STATUS
+  ===================================================== */
 
   status: BookingStatus;
 
@@ -117,57 +160,83 @@ export type Booking = {
 
 export type BookingResponse = {
   success: boolean;
-
   message?: string;
-
   total?: number;
-
   data?: Booking;
 };
 
 export type BookingListResponse = {
   success: boolean;
-
   message?: string;
-
   total?: number;
-
   data: Booking[];
 };
 
 /* =========================================================
    CREATE SERVICE BOOKING
-   ---------------------------------------------------------
-   ⭐ FIXED: এখন address/phone/urgency (optional) ফিল্ডও
-   পাঠানো যায় — BookWorkerScreen-এর "Book Now" ফ্লো এই
-   ফাংশনটাই ব্যবহার করবে (আগে সেটা ভুল করে createJob()
-   কল করত)।
 ========================================================= */
 
 export async function createBooking(
   data: {
     serviceId: string;
 
-    requestedDate?:
-      | string
-      | null;
+    requestedDate?: string | null;
 
     customerMessage?: string;
 
-    /*
-     * ⭐ NEW
+    /**
+     * Service address
      */
     address?: string;
 
+    /**
+     * Customer city
+     */
+    city?: string;
+
+    /**
+     * Customer phone
+     */
     phone?: string;
 
+    /**
+     * Booking urgency
+     */
     urgency?: "normal" | "urgent";
+
+    /**
+     * Selected package
+     */
+    packageId?:
+      | "basic"
+      | "standard"
+      | "premium";
+
+    packageTitle?: string;
+
+    packagePrice?: number;
+
+    packageDeliveryHours?: number;
+
+    selectedPackage?: {
+      id:
+        | "basic"
+        | "standard"
+        | "premium";
+
+      title: string;
+
+      price: number;
+
+      description?: string;
+
+      deliveryHours?: number;
+    };
   }
 ): Promise<BookingResponse> {
-  const serviceId =
-    String(
-      data?.serviceId || ""
-    ).trim();
+  const serviceId = String(
+    data?.serviceId || ""
+  ).trim();
 
   if (!serviceId) {
     throw new Error(
@@ -180,7 +249,26 @@ export async function createBooking(
       "/bookings",
       {
         ...data,
+
         serviceId,
+
+        // Make sure city is sent as a clean value
+        city:
+          typeof data.city === "string"
+            ? data.city.trim()
+            : undefined,
+
+        // Make sure phone is sent as a clean value
+        phone:
+          typeof data.phone === "string"
+            ? data.phone.trim()
+            : undefined,
+
+        // Make sure address is sent as a clean value
+        address:
+          typeof data.address === "string"
+            ? data.address.trim()
+            : undefined,
       }
     );
 
@@ -200,12 +288,11 @@ export async function getCustomerBookings(): Promise<BookingListResponse> {
   return {
     ...response.data,
 
-    data:
-      Array.isArray(
-        response.data?.data
-      )
-        ? response.data.data
-        : [],
+    data: Array.isArray(
+      response.data?.data
+    )
+      ? response.data.data
+      : [],
   };
 }
 
@@ -222,12 +309,11 @@ export async function getWorkerBookings(): Promise<BookingListResponse> {
   return {
     ...response.data,
 
-    data:
-      Array.isArray(
-        response.data?.data
-      )
-        ? response.data.data
-        : [],
+    data: Array.isArray(
+      response.data?.data
+    )
+      ? response.data.data
+      : [],
   };
 }
 
@@ -238,8 +324,9 @@ export async function getWorkerBookings(): Promise<BookingListResponse> {
 export async function getBookingById(
   id: string
 ): Promise<BookingResponse> {
-  const bookingId =
-    String(id || "").trim();
+  const bookingId = String(
+    id || ""
+  ).trim();
 
   if (!bookingId) {
     throw new Error(
@@ -264,8 +351,9 @@ export async function getBookingById(
 export async function acceptBooking(
   id: string
 ): Promise<BookingResponse> {
-  const bookingId =
-    String(id || "").trim();
+  const bookingId = String(
+    id || ""
+  ).trim();
 
   if (!bookingId) {
     throw new Error(
@@ -290,8 +378,9 @@ export async function acceptBooking(
 export async function rejectBooking(
   id: string
 ): Promise<BookingResponse> {
-  const bookingId =
-    String(id || "").trim();
+  const bookingId = String(
+    id || ""
+  ).trim();
 
   if (!bookingId) {
     throw new Error(
@@ -317,16 +406,14 @@ export async function proposeBookingTime(
   id: string,
   data: {
     date: string;
-
     startTime: string;
-
     endTime: string;
-
     message?: string;
   }
 ): Promise<BookingResponse> {
-  const bookingId =
-    String(id || "").trim();
+  const bookingId = String(
+    id || ""
+  ).trim();
 
   if (!bookingId) {
     throw new Error(
@@ -359,10 +446,8 @@ export async function proposeBookingTime(
       )}/propose-time`,
       {
         date: data.date,
-        startTime:
-          data.startTime,
-        endTime:
-          data.endTime,
+        startTime: data.startTime,
+        endTime: data.endTime,
         message:
           data.message || "",
       }
@@ -378,8 +463,9 @@ export async function proposeBookingTime(
 export async function confirmBooking(
   id: string
 ): Promise<BookingResponse> {
-  const bookingId =
-    String(id || "").trim();
+  const bookingId = String(
+    id || ""
+  ).trim();
 
   if (!bookingId) {
     throw new Error(
@@ -404,8 +490,9 @@ export async function confirmBooking(
 export async function startBooking(
   id: string
 ): Promise<BookingResponse> {
-  const bookingId =
-    String(id || "").trim();
+  const bookingId = String(
+    id || ""
+  ).trim();
 
   if (!bookingId) {
     throw new Error(
@@ -430,8 +517,9 @@ export async function startBooking(
 export async function completeBooking(
   id: string
 ): Promise<BookingResponse> {
-  const bookingId =
-    String(id || "").trim();
+  const bookingId = String(
+    id || ""
+  ).trim();
 
   if (!bookingId) {
     throw new Error(
@@ -456,8 +544,9 @@ export async function completeBooking(
 export async function cancelBooking(
   id: string
 ): Promise<BookingResponse> {
-  const bookingId =
-    String(id || "").trim();
+  const bookingId = String(
+    id || ""
+  ).trim();
 
   if (!bookingId) {
     throw new Error(

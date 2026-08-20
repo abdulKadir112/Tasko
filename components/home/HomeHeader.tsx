@@ -12,6 +12,7 @@ import { router } from "expo-router";
 
 import { COLORS } from "@/theme";
 import { useAuthContext } from "@/context/AuthContext";
+import { useNotifications } from "@/hooks/useNotifications";
 
 export default function HomeHeader() {
   const { user } = useAuthContext();
@@ -20,7 +21,21 @@ export default function HomeHeader() {
   const role = user?.role || "customer";
   const location = user?.city || "Bangladesh";
   const avatar = user?.photoURL || "";
-  const notificationCount = 0;
+
+  /**
+   * Unread notification count.
+   *
+   * useNotifications hook নিজেই প্রতি 15 সেকেন্ডে
+   * unread count refresh করে (polling), তাই এখানে
+   * আলাদা কোনো interval লাগবে না।
+   */
+  const { unreadCount } = useNotifications({
+    autoFetch: true,
+    enablePolling: true,
+    pollingInterval: 15000,
+  });
+
+  const notificationCount = unreadCount;
 
   function openProfile() {
     if (role === "worker") {

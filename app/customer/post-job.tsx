@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   Image,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 
 import * as ImagePicker from "expo-image-picker";
@@ -203,6 +205,11 @@ export default function PostJob() {
         </View>
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
+      >
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -466,6 +473,7 @@ export default function PostJob() {
           )}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

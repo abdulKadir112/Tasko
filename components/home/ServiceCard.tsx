@@ -36,8 +36,7 @@ export default function ServiceCard({
   onPress,
   onBook,
 }: Props) {
-  const hasImage =
-    typeof image === "string" && image.trim().length > 0;
+  const hasImage = typeof image === "string" && image.trim().length > 0;
 
   return (
     <TouchableOpacity
@@ -45,12 +44,13 @@ export default function ServiceCard({
       activeOpacity={0.9}
       onPress={onPress}
     >
+      {/* Image */}
       <View style={styles.imageWrap}>
         {hasImage ? (
           <Image source={{ uri: image as string }} style={styles.image} />
         ) : (
           <View style={styles.imageFallback}>
-            <Text style={{ fontSize: 38 }}>
+            <Text style={styles.fallbackEmoji}>
               {isEmergency ? "🚨" : "👨‍🔧"}
             </Text>
           </View>
@@ -64,6 +64,7 @@ export default function ServiceCard({
         )}
       </View>
 
+      {/* Info */}
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={2}>
           {title}
@@ -90,6 +91,7 @@ export default function ServiceCard({
           </View>
         </View>
 
+        {/* Book / Call Button */}
         <TouchableOpacity
           style={[styles.button, isEmergency && styles.emergencyBtn]}
           onPress={onBook || onPress}
@@ -133,6 +135,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#EEF4FF",
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  fallbackEmoji: {
+    fontSize: 38,
   },
 
   emergencyBadge: {

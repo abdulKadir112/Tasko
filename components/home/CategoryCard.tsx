@@ -24,14 +24,14 @@ export default function CategoryCard({
   return (
     <TouchableOpacity
       style={styles.container}
-      activeOpacity={0.8}
+      activeOpacity={0.7}
       onPress={() => onPress(id)}
     >
       <View style={styles.iconBox}>
         <Text style={styles.emoji}>{emoji}</Text>
       </View>
 
-      <Text numberOfLines={2} style={styles.title}>
+      <Text numberOfLines={1} style={styles.title}>
         {title}
       </Text>
     </TouchableOpacity>
@@ -40,40 +40,38 @@ export default function CategoryCard({
 
 const styles = StyleSheet.create({
   container: {
-    width: "23%",
+    width: 60,
     alignItems: "center",
-    marginBottom: 22,
+    marginRight: 12,
   },
 
   iconBox: {
-    width: 70,
-    height: 70,
-    borderRadius: 18,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     backgroundColor: "#FFFFFF",
-
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.04)",
     justifyContent: "center",
     alignItems: "center",
-
+    // Clean & Subtle Shadow
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
 
   emoji: {
-    fontSize: 34,
+    fontSize: 20,
   },
 
   title: {
-    marginTop: 10,
+    marginTop: 6,
     textAlign: "center",
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 11,
+    fontWeight: "500",
     color: COLORS.text,
+    letterSpacing: -0.2,
   },
 });

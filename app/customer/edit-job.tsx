@@ -9,6 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 
 import { useLocalSearchParams, router } from "expo-router";
@@ -143,6 +145,11 @@ export default function EditJobScreen() {
         </View>
       </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
+      >
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -275,6 +282,7 @@ export default function EditJobScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

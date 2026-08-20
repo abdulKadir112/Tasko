@@ -12,6 +12,9 @@ import {
   RefreshControl,
   TextInput,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
 
 import { router } from "expo-router";
@@ -95,33 +98,13 @@ export default function WorkerJobs() {
         JSON.stringify(bookingRes, null, 2)
       );
 
-      /*
-       * Different possible API structures handle করা হচ্ছে
-       *
-       * {
-       *   data: [...]
-       * }
-       *
-       * অথবা
-       *
-       * {
-       *   data: {
-       *     data: [...]
-       *   }
-       * }
-       *
-       * অথবা সরাসরি [...]
-       */
+      const bidData = extractArray(bidRes);
 
-      const bidData = extractArray(
-        bidRes
-      );
-
-      const bookingData = extractArray(
-        bookingRes
-      );
+      const bookingData =
+        extractArray(bookingRes);
 
       setBids(bidData);
+
       setBookings(
         bookingData as Booking[]
       );
@@ -153,9 +136,7 @@ export default function WorkerJobs() {
       return response;
     }
 
-    if (
-      Array.isArray(response?.data)
-    ) {
+    if (Array.isArray(response?.data)) {
       return response.data;
     }
 
@@ -176,17 +157,13 @@ export default function WorkerJobs() {
     }
 
     if (
-      Array.isArray(
-        response?.items
-      )
+      Array.isArray(response?.items)
     ) {
       return response.items;
     }
 
     if (
-      Array.isArray(
-        response?.results
-      )
+      Array.isArray(response?.results)
     ) {
       return response.results;
     }
@@ -216,9 +193,7 @@ export default function WorkerJobs() {
         JSON.stringify(bidRes, null, 2)
       );
 
-      const bidData = extractArray(
-        bidRes
-      );
+      const bidData = extractArray(bidRes);
 
       const bookingData =
         extractArray(bookingRes);
@@ -801,8 +776,6 @@ export default function WorkerJobs() {
       {/* TABS */}
 
       <View style={styles.tabs}>
-        {/* BOOKINGS */}
-
         <TouchableOpacity
           style={[
             styles.tab,
@@ -864,8 +837,6 @@ export default function WorkerJobs() {
             </View>
           )}
         </TouchableOpacity>
-
-        {/* MY BIDS */}
 
         <TouchableOpacity
           style={[
@@ -929,17 +900,14 @@ export default function WorkerJobs() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={
-                onRefresh
-              }
+              onRefresh={onRefresh}
               colors={[
                 COLORS.primary,
               ]}
             />
           }
           contentContainerStyle={
-            bookings.length ===
-            0
+            bookings.length === 0
               ? styles.emptyList
               : styles.list
           }
@@ -1033,9 +1001,7 @@ export default function WorkerJobs() {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={
-                onRefresh
-              }
+              onRefresh={onRefresh}
               colors={[
                 COLORS.primary,
               ]}
@@ -1079,11 +1045,6 @@ export default function WorkerJobs() {
           renderItem={({
             item,
           }) => {
-            /*
-             * API response-এর বিভিন্ন
-             * structure support করা হচ্ছে।
-             */
-
             const job =
               item?.job ||
               item?.Job ||
@@ -1171,9 +1132,7 @@ export default function WorkerJobs() {
                     style={
                       styles.bidTitle
                     }
-                    numberOfLines={
-                      2
-                    }
+                    numberOfLines={2}
                   >
                     {title}
                   </Text>
@@ -1227,223 +1186,285 @@ export default function WorkerJobs() {
       ================================================= */}
 
       <Modal
-        visible={
-          scheduleModal
-        }
+        visible={scheduleModal}
         transparent
         animationType="slide"
         onRequestClose={() =>
           setScheduleModal(false)
         }
       >
-        <View
-          style={
-            styles.modalOverlay
+        {/* 
+          IMPORTANT:
+          KeyboardAvoidingView MUST be INSIDE Modal.
+          Modal নিজস্ব native layer-এ render হয়।
+        */}
+
+        <KeyboardAvoidingView
+          style={styles.keyboardContainer}
+          behavior={
+            Platform.OS === "ios"
+              ? "padding"
+              : "height"
+          }
+          keyboardVerticalOffset={
+            Platform.OS === "ios" ? 0 : 20
           }
         >
           <View
-            style={styles.modal}
+            style={
+              styles.modalOverlay
+            }
           >
             <View
-              style={
-                styles.modalHeader
-              }
+              style={styles.modal}
             >
-              <View>
-                <Text
-                  style={
-                    styles.modalTitle
-                  }
-                >
-                  Set Service Time
-                </Text>
+              {/* 
+                ScrollView রাখা হয়েছে যাতে keyboard
+                উঠলেও নিচের input/button দেখা যায়।
+              */}
 
-                <Text
-                  style={
-                    styles.modalSub
-                  }
-                >
-                  Choose when you can do
-                  the work
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() =>
-                  setScheduleModal(
-                    false
-                  )
+              <ScrollView
+                showsVerticalScrollIndicator={
+                  false
+                }
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={
+                  styles.modalScrollContent
                 }
               >
-                <Ionicons
-                  name="close"
-                  size={25}
-                  color="#0F172A"
-                />
-              </TouchableOpacity>
-            </View>
+                {/* MODAL HEADER */}
 
-            <Text
-              style={
-                styles.inputLabel
-              }
-            >
-              Date
-            </Text>
-
-            <View
-              style={
-                styles.inputWrapper
-              }
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={19}
-                color="#64748B"
-              />
-
-              <TextInput
-                value={date}
-                onChangeText={
-                  setDate
-                }
-                placeholder="2026-08-20"
-                placeholderTextColor="#94A3B8"
-                style={
-                  styles.input
-                }
-              />
-            </View>
-
-            <Text
-              style={
-                styles.inputLabel
-              }
-            >
-              Start Time
-            </Text>
-
-            <View
-              style={
-                styles.inputWrapper
-              }
-            >
-              <Ionicons
-                name="time-outline"
-                size={19}
-                color="#64748B"
-              />
-
-              <TextInput
-                value={
-                  startTime
-                }
-                onChangeText={
-                  setStartTime
-                }
-                placeholder="10:00 AM"
-                placeholderTextColor="#94A3B8"
-                style={
-                  styles.input
-                }
-              />
-            </View>
-
-            <Text
-              style={
-                styles.inputLabel
-              }
-            >
-              End Time
-            </Text>
-
-            <View
-              style={
-                styles.inputWrapper
-              }
-            >
-              <Ionicons
-                name="time-outline"
-                size={19}
-                color="#64748B"
-              />
-
-              <TextInput
-                value={
-                  endTime
-                }
-                onChangeText={
-                  setEndTime
-                }
-                placeholder="12:00 PM"
-                placeholderTextColor="#94A3B8"
-                style={
-                  styles.input
-                }
-              />
-            </View>
-
-            <Text
-              style={
-                styles.inputLabel
-              }
-            >
-              Message
-            </Text>
-
-            <TextInput
-              value={
-                workerMessage
-              }
-              onChangeText={
-                setWorkerMessage
-              }
-              placeholder="Tell customer anything important..."
-              placeholderTextColor="#94A3B8"
-              multiline
-              numberOfLines={3}
-              style={
-                styles.messageInput
-              }
-            />
-
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                actionLoading &&
-                  styles.disabledButton,
-              ]}
-              disabled={
-                actionLoading
-              }
-              onPress={
-                handleProposeTime
-              }
-            >
-              {actionLoading ? (
-                <ActivityIndicator
-                  color="#fff"
-                />
-              ) : (
-                <>
-                  <Ionicons
-                    name="send-outline"
-                    size={19}
-                    color="#fff"
-                  />
-
-                  <Text
+                <View
+                  style={
+                    styles.modalHeader
+                  }
+                >
+                  <View
                     style={
-                      styles.sendButtonText
+                      styles.modalHeaderInfo
                     }
                   >
-                    Send Schedule
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
+                    <Text
+                      style={
+                        styles.modalTitle
+                      }
+                    >
+                      Set Service Time
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.modalSub
+                      }
+                    >
+                      Choose when you can do
+                      the work
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={
+                      styles.modalCloseButton
+                    }
+                    onPress={() =>
+                      setScheduleModal(
+                        false
+                      )
+                    }
+                  >
+                    <Ionicons
+                      name="close"
+                      size={25}
+                      color="#0F172A"
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* DATE */}
+
+                <Text
+                  style={
+                    styles.inputLabel
+                  }
+                >
+                  Date
+                </Text>
+
+                <View
+                  style={
+                    styles.inputWrapper
+                  }
+                >
+                  <Ionicons
+                    name="calendar-outline"
+                    size={19}
+                    color="#64748B"
+                  />
+
+                  <TextInput
+                    value={date}
+                    onChangeText={
+                      setDate
+                    }
+                    placeholder="2026-08-20"
+                    placeholderTextColor="#94A3B8"
+                    style={
+                      styles.input
+                    }
+                    returnKeyType="next"
+                  />
+                </View>
+
+                {/* START TIME */}
+
+                <Text
+                  style={
+                    styles.inputLabel
+                  }
+                >
+                  Start Time
+                </Text>
+
+                <View
+                  style={
+                    styles.inputWrapper
+                  }
+                >
+                  <Ionicons
+                    name="time-outline"
+                    size={19}
+                    color="#64748B"
+                  />
+
+                  <TextInput
+                    value={
+                      startTime
+                    }
+                    onChangeText={
+                      setStartTime
+                    }
+                    placeholder="10:00 AM"
+                    placeholderTextColor="#94A3B8"
+                    style={
+                      styles.input
+                    }
+                    returnKeyType="next"
+                  />
+                </View>
+
+                {/* END TIME */}
+
+                <Text
+                  style={
+                    styles.inputLabel
+                  }
+                >
+                  End Time
+                </Text>
+
+                <View
+                  style={
+                    styles.inputWrapper
+                  }
+                >
+                  <Ionicons
+                    name="time-outline"
+                    size={19}
+                    color="#64748B"
+                  />
+
+                  <TextInput
+                    value={
+                      endTime
+                    }
+                    onChangeText={
+                      setEndTime
+                    }
+                    placeholder="12:00 PM"
+                    placeholderTextColor="#94A3B8"
+                    style={
+                      styles.input
+                    }
+                    returnKeyType="next"
+                  />
+                </View>
+
+                {/* MESSAGE */}
+
+                <Text
+                  style={
+                    styles.inputLabel
+                  }
+                >
+                  Message
+                </Text>
+
+                <TextInput
+                  value={
+                    workerMessage
+                  }
+                  onChangeText={
+                    setWorkerMessage
+                  }
+                  placeholder="Tell customer anything important..."
+                  placeholderTextColor="#94A3B8"
+                  multiline
+                  numberOfLines={4}
+                  style={
+                    styles.messageInput
+                  }
+                />
+
+                {/* SEND */}
+
+                <TouchableOpacity
+                  style={[
+                    styles.sendButton,
+                    actionLoading &&
+                      styles.disabledButton,
+                  ]}
+                  disabled={
+                    actionLoading
+                  }
+                  onPress={
+                    handleProposeTime
+                  }
+                  activeOpacity={0.85}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator
+                      color="#fff"
+                    />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="send-outline"
+                        size={19}
+                        color="#fff"
+                      />
+
+                      <Text
+                        style={
+                          styles.sendButtonText
+                        }
+                      >
+                        Send Schedule
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* BOTTOM SPACE */}
+
+                <View
+                  style={
+                    styles.modalBottomSpace
+                  }
+                />
+              </ScrollView>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -2344,7 +2365,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
 
-  /* MODAL */
+  /* =====================================================
+     MODAL + KEYBOARD
+  ===================================================== */
+
+  keyboardContainer: {
+    flex: 1,
+  },
 
   modalOverlay: {
     flex: 1,
@@ -2354,11 +2381,17 @@ const styles = StyleSheet.create({
   },
 
   modal: {
+    maxHeight: "92%",
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 20,
-    paddingBottom: 30,
+    overflow: "hidden",
+  },
+
+  modalScrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
 
   modalHeader: {
@@ -2366,6 +2399,20 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     marginBottom: 18,
+  },
+
+  modalHeaderInfo: {
+    flex: 1,
+    paddingRight: 12,
+  },
+
+  modalCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   modalTitle: {
@@ -2405,10 +2452,11 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     fontSize: 14,
     fontWeight: "600",
+    paddingVertical: 11,
   },
 
   messageInput: {
-    minHeight: 80,
+    minHeight: 90,
     borderWidth: 1,
     borderColor: "#CBD5E1",
     borderRadius: 13,
@@ -2439,5 +2487,9 @@ const styles = StyleSheet.create({
 
   disabledButton: {
     opacity: 0.6,
+  },
+
+  modalBottomSpace: {
+    height: 20,
   },
 });
